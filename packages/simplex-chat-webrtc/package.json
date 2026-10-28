@@ -9,7 +9,9 @@
   ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "prettier --write --ignore-unknown . && tsc && ./copy"
+    "build": "prettier --write --ignore-unknown . && tsc && ./copy",
+    "test:group-audio": "tsc && node --test tests/group-audio.test.cjs",
+    "test:group-audio:browser": "tsc && node tests/group-audio.browser.cjs"
   },
   "repository": {
     "type": "git",
