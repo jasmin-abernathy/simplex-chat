@@ -528,6 +528,7 @@
     <string name="contact_wants_to_connect_via_call">%1$s veut se connecter à vous via</string>
     <string name="your_calls">Vos appels</string>
     <string name="always_use_relay">Se connecter via relais</string>
+    <string name="call_disable_proximity_sensor">Désactiver le capteur de proximité pendant les appels</string>
     <string name="call_on_lock_screen">Appels sur l\'écran de verrouillage :</string>
     <string name="show_call_on_lock_screen">Afficher</string>
     <string name="no_call_on_lock_screen">Désactiver</string>
