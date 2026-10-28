@@ -667,6 +667,7 @@ private suspend fun exportArchive(
           else MR.strings.rv_export_partial_cleanup_failed
         )
       )
+      return true
     } else {
       showArchiveExportedWithErrorsAlert(generalGetString(MR.strings.chat_database_exported_save), archiveErrors) {
         withLongRunningApi {
@@ -674,9 +675,19 @@ private suspend fun exportArchive(
         }
       }
     }
-    progressIndicator.value = false
   } catch (e: Throwable) {
-    AlertManager.shared.showAlertMsg(generalGetString(MR.strings.error_exporting_chat_database), e.toString())
+    if (e.suppressed.any { it is VaultExportCleanupException }) {
+      AlertManager.shared.showAlertMsg(
+        generalGetString(MR.strings.rv_export_manual_title),
+        generalGetString(MR.strings.rv_export_exception_cleanup_failed)
+      )
+    } else if (e !is CancellationException) {
+      AlertManager.shared.showAlertMsg(generalGetString(MR.strings.error_exporting_chat_database), e.toString())
+    }
+    if (e is CancellationException) throw e
+    // Rejected vault attempts must not leave a previously running chat stopped.
+    if (requireComplete) return true
+  } finally {
     progressIndicator.value = false
   }
   return false
@@ -694,12 +705,19 @@ suspend fun exportChatArchive(
   val archiveName = if (temporary) "simplex-chat.$ts.${UUID.randomUUID()}.zip" else "simplex-chat.$ts.zip"
   val archivePath = "${(storagePath ?: databaseExportDir).absolutePath}${File.separator}$archiveName"
   val config = ArchiveConfig(archivePath, parentTempDirectory = databaseExportDir.toString())
-  // Settings should be saved before changing a passphrase, otherwise the database needs to be migrated first
-  if (!m.chatDbChanged.value) {
-    controller.apiSaveAppSettings(AppSettings.current.prepareForExport())
+  suspend fun createArchive(): List<ArchiveError> {
+    // Save settings before export; any failure must clean this attempt's ZIP.
+    if (!m.chatDbChanged.value) {
+      controller.apiSaveAppSettings(AppSettings.current.prepareForExport())
+    }
+    wallpapersDir.mkdirs()
+    return m.controller.apiExportArchive(config)
   }
-  wallpapersDir.mkdirs()
-  val archiveErrors = m.controller.apiExportArchive(config)
+  val archiveErrors = if (temporary) {
+    runVaultExportAttempt(File(archivePath)) { createArchive() }
+  } else {
+    createArchive()
+  }
   if (storagePath == null && !temporary) {
     deleteOldChatArchive()
     m.controller.appPrefs.chatArchiveName.set(archiveName)

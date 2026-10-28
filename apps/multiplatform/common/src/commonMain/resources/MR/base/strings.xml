@@ -3221,4 +3221,5 @@
   <string name="rv_export_disconnect_remote">Disconnect remote hosts before exporting a local archive.</string>
   <string name="rv_export_partial_rejected">The export reported errors. The incomplete archive was not offered for saving. Its temporary copy was removed.</string>
   <string name="rv_export_partial_cleanup_failed">The export reported errors. The incomplete archive was not offered for saving, but its temporary file could not be deleted. Remove it manually before continuing.</string>
+  <string name="rv_export_exception_cleanup_failed">The export failed and its temporary archive could not be removed. No archive was offered for saving. Remove the temporary copy before continuing.</string>
 </resources>

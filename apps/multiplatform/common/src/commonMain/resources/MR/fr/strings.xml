@@ -2455,4 +2455,5 @@
     <string name="rv_export_disconnect_remote">Déconnectez les hôtes distants avant d\'exporter une archive locale.</string>
     <string name="rv_export_partial_rejected">L\'export a signalé des erreurs. L\'archive incomplète n\'a pas été proposée. Sa copie temporaire a été supprimée.</string>
     <string name="rv_export_partial_cleanup_failed">L\'export a signalé des erreurs. L\'archive incomplète n\'a pas été proposée, mais son fichier temporaire n\'a pas pu être supprimé. Retirez-le manuellement avant de continuer.</string>
+  <string name="rv_export_exception_cleanup_failed">L’export a échoué et son archive temporaire n’a pas pu être supprimée. Aucune archive n’a été proposée. Supprimez la copie temporaire avant de continuer.</string>
 </resources>
