@@ -1,0 +1,31 @@
+name: Group audio prototype checks
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/android-group-audio]
+    paths:
+      - packages/simplex-chat-webrtc/**
+      - .github/workflows/group-audio-checks.yml
+
+permissions:
+  contents: read
+
+jobs:
+  group-audio:
+    if: github.repository == 'jasmin-abernathy/simplex-chat'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: packages/simplex-chat-webrtc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --ignore-scripts --no-package-lock
+      - run: npm install --ignore-scripts --no-package-lock --no-save playwright@1.62.1
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:group-audio
+      - run: npm run test:group-audio:browser
