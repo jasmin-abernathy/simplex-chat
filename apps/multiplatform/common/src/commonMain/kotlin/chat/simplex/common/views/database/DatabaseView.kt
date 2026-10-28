@@ -269,25 +269,7 @@ fun DatabaseManagementView() {
             painterResource(MR.images.ic_ios_share),
             stringResource(MR.strings.rv_export_manual_title),
             click = {
-              val blocked = VaultExportGate.check(
-                localDatabaseAvailable = m.localUserCreated.value == true,
-                encrypted = m.chatDbEncrypted.value,
-                initialRandomPassphrase = prefs.initialRandomDBPassphrase.get(),
-                remoteHostConnected = m.remoteHosts.any { it.sessionState is RemoteHostSessionState.Connected }
-              )
-              if (blocked != null) {
-                val reason = when (blocked) {
-                  VaultExportBlock.NO_LOCAL_DATABASE -> MR.strings.rv_export_no_local_database
-                  VaultExportBlock.DATABASE_ENCRYPTION_UNKNOWN -> MR.strings.rv_export_encryption_unknown
-                  VaultExportBlock.DATABASE_NOT_ENCRYPTED -> MR.strings.rv_export_database_unencrypted
-                  VaultExportBlock.PASSPHRASE_NOT_RECOVERABLE -> MR.strings.rv_export_passphrase_required
-                  VaultExportBlock.REMOTE_HOST_CONNECTED -> MR.strings.rv_export_disconnect_remote
-                }
-                AlertManager.shared.showAlertMsg(
-                  title = generalGetString(MR.strings.rv_export_manual_title),
-                  text = generalGetString(reason)
-                )
-              } else {
+              if (allowVaultExport(m)) {
                 AlertManager.shared.showAlertMsg(
                   title = generalGetString(MR.strings.rv_export_manual_title),
                   text = generalGetString(MR.strings.rv_export_manual_notice),
@@ -636,6 +618,27 @@ fun deleteChatDatabaseFilesAndState() {
   ntfManager.cancelAllNotifications()
 }
 
+private fun allowVaultExport(m: ChatModel): Boolean {
+  val blocked = VaultExportGate.check(
+    localDatabaseAvailable = m.localUserCreated.value == true,
+    encrypted = m.chatDbEncrypted.value,
+    initialRandomPassphrase = m.controller.appPrefs.initialRandomDBPassphrase.get(),
+    remoteHostConnected = m.remoteHosts.any { it.sessionState is RemoteHostSessionState.Connected }
+  ) ?: return true
+  val reason = when (blocked) {
+    VaultExportBlock.NO_LOCAL_DATABASE -> MR.strings.rv_export_no_local_database
+    VaultExportBlock.DATABASE_ENCRYPTION_UNKNOWN -> MR.strings.rv_export_encryption_unknown
+    VaultExportBlock.DATABASE_NOT_ENCRYPTED -> MR.strings.rv_export_database_unencrypted
+    VaultExportBlock.PASSPHRASE_NOT_RECOVERABLE -> MR.strings.rv_export_passphrase_required
+    VaultExportBlock.REMOTE_HOST_CONNECTED -> MR.strings.rv_export_disconnect_remote
+  }
+  AlertManager.shared.showAlertMsg(
+    title = generalGetString(MR.strings.rv_export_manual_title),
+    text = generalGetString(reason)
+  )
+  return false
+}
+
 private suspend fun exportArchive(
   m: ChatModel,
   progressIndicator: MutableState<Boolean>,
@@ -643,9 +646,11 @@ private suspend fun exportArchive(
   saveArchiveLauncher: FileChooserLauncher,
   requireComplete: Boolean = false
 ): Boolean {
+  // Confirmation and authentication can suspend the flow: read the current state again.
+  if (requireComplete && !allowVaultExport(m)) return true
   progressIndicator.value = true
   try {
-    val (archiveFile, archiveErrors) = exportChatArchive(m, null, chatArchiveFile)
+    val (archiveFile, archiveErrors) = exportChatArchive(m, null, chatArchiveFile, temporary = requireComplete)
     chatArchiveFile.value = archiveFile
     if (archiveErrors.isEmpty()) {
       saveArchiveLauncher.launch(archiveFile.substringAfterLast(File.separator))
@@ -654,8 +659,6 @@ private suspend fun exportArchive(
       val removed = !File(archiveFile).exists() || File(archiveFile).delete()
       if (removed) {
         chatArchiveFile.value = null
-        m.controller.appPrefs.chatArchiveName.set(null)
-        m.controller.appPrefs.chatArchiveTime.set(null)
       }
       AlertManager.shared.showAlertMsg(
         title = generalGetString(MR.strings.rv_export_manual_title),
@@ -682,11 +685,13 @@ private suspend fun exportArchive(
 suspend fun exportChatArchive(
   m: ChatModel,
   storagePath: File?,
-  chatArchiveFile: MutableState<String?>
+  chatArchiveFile: MutableState<String?>,
+  temporary: Boolean = false
 ): Pair<String, List<ArchiveError>> {
   val archiveTime = Clock.System.now()
   val ts = SimpleDateFormat("yyyy-MM-dd'T'HHmmss", Locale.US).format(Date.from(archiveTime.toJavaInstant()))
-  val archiveName = "simplex-chat.$ts.zip"
+  // A vault attempt must never overwrite or retire a previous recovery archive.
+  val archiveName = if (temporary) "simplex-chat.$ts.${UUID.randomUUID()}.zip" else "simplex-chat.$ts.zip"
   val archivePath = "${(storagePath ?: databaseExportDir).absolutePath}${File.separator}$archiveName"
   val config = ArchiveConfig(archivePath, parentTempDirectory = databaseExportDir.toString())
   // Settings should be saved before changing a passphrase, otherwise the database needs to be migrated first
@@ -695,7 +700,7 @@ suspend fun exportChatArchive(
   }
   wallpapersDir.mkdirs()
   val archiveErrors = m.controller.apiExportArchive(config)
-  if (storagePath == null) {
+  if (storagePath == null && !temporary) {
     deleteOldChatArchive()
     m.controller.appPrefs.chatArchiveName.set(archiveName)
     m.controller.appPrefs.chatArchiveTime.set(archiveTime)

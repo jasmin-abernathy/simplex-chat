@@ -22,6 +22,22 @@ class VaultExportGateTest {
     assertEquals(VaultExportBlock.REMOTE_HOST_CONNECTED, VaultExportGate.check(true, true, false, true))
   }
 
+  @Test fun onlyOneCombinationOfPreconditionsPermitsExport() {
+    for (local in listOf(false, true)) {
+      for (encrypted in listOf(null, false, true)) {
+        for (initialPassphrase in listOf(false, true)) {
+          for (remoteConnected in listOf(false, true)) {
+            assertEquals(
+              local && encrypted == true && !initialPassphrase && !remoteConnected,
+              VaultExportGate.check(local, encrypted, initialPassphrase, remoteConnected) == null,
+              "local=$local encrypted=$encrypted initialPassphrase=$initialPassphrase remoteConnected=$remoteConnected"
+            )
+          }
+        }
+      }
+    }
+  }
+
   @Test fun refusesPartialArchiveAndInvalidErrorCounts() {
     assertTrue(VaultExportGate.canOfferArchive(0))
     assertFalse(VaultExportGate.canOfferArchive(1))
