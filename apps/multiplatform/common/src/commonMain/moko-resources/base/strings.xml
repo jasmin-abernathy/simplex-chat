@@ -1420,6 +1420,7 @@
   <string name="settings_audio_video_calls">Audio &amp; video calls</string>
   <string name="your_calls">Your calls</string>
   <string name="always_use_relay">Always use relay</string>
+    <string name="call_disable_proximity_sensor">Disable proximity sensor during calls</string>
   <string name="call_on_lock_screen">Calls on lock screen:</string>
   <string name="accept_call_on_lock_screen">Accept</string>
   <string name="show_call_on_lock_screen">Show</string>

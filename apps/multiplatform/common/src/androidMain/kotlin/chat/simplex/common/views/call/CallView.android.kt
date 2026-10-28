@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -71,7 +72,7 @@ fun activeCallDestroyWebView() = withApi {
 }
 
 class ActiveCallState: Closeable {
-  val proximityLock: WakeLock? = screenOffWakeLock()
+  private val proximityLock: WakeLock? = screenOffWakeLock()
   var wasConnected = false
   val callAudioDeviceManager = CallAudioDeviceManagerInterface.new()
   private var closed = false
@@ -82,6 +83,7 @@ class ActiveCallState: Closeable {
     }
   }
 
+  @Synchronized
   override fun close() {
     if (closed) return
     closed = true
@@ -93,6 +95,15 @@ class ActiveCallState: Closeable {
     dropAudioManagerOverrides()
     if (proximityLock?.isHeld == true) {
       proximityLock.release()
+    }
+  }
+
+  @Synchronized
+  fun setProximityLockEnabled(enabled: Boolean) {
+    if (enabled && !closed) {
+      if (proximityLock?.isHeld == false) proximityLock.acquire()
+    } else {
+      if (proximityLock?.isHeld == true) proximityLock.release()
     }
   }
 
@@ -120,13 +131,25 @@ actual fun ActiveCallView() {
       callState.wasConnected = true
     }
   }
-  LaunchedEffect(callState, chatModel.activeCallViewIsCollapsed.value) {
+  val disableProximitySensor = remember { appPrefs.callDisableProximitySensor.state }.value
+  val view = LocalView.current
+  val keepCallScreenOn = callState != null && !chatModel.activeCallViewIsCollapsed.value && disableProximitySensor
+  DisposableEffect(view, keepCallScreenOn) {
+    if (!keepCallScreenOn) return@DisposableEffect onDispose {}
+    val previousKeepScreenOn = view.keepScreenOn
+    view.keepScreenOn = true
+    onDispose { view.keepScreenOn = previousKeepScreenOn }
+  }
+  LaunchedEffect(callState, chatModel.activeCallViewIsCollapsed.value, disableProximitySensor) {
     callState ?: return@LaunchedEffect
-    if (chatModel.activeCallViewIsCollapsed.value) {
-      if (callState.proximityLock?.isHeld == true) callState.proximityLock.release()
-    } else {
-      delay(1000)
-      if (callState.proximityLock?.isHeld == false) callState.proximityLock.acquire()
+    try {
+      if (!chatModel.activeCallViewIsCollapsed.value && !disableProximitySensor) {
+        delay(1000)
+        callState.setProximityLockEnabled(true)
+        awaitCancellation()
+      }
+    } finally {
+      callState.setProximityLockEnabled(false)
     }
   }
   Box(Modifier.fillMaxSize()) {

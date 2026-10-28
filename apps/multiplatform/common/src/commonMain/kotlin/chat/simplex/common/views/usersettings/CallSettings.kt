@@ -27,6 +27,7 @@ fun CallSettingsView(m: ChatModel,
   CallSettingsLayout(
     webrtcPolicyRelay = m.controller.appPrefs.webrtcPolicyRelay,
     callOnLockScreen = m.controller.appPrefs.callOnLockScreen,
+    callDisableProximitySensor = m.controller.appPrefs.callDisableProximitySensor,
     editIceServers = showModal { RTCServersView(m) }
   )
 }
@@ -35,6 +36,7 @@ fun CallSettingsView(m: ChatModel,
 fun CallSettingsLayout(
   webrtcPolicyRelay: SharedPreference<Boolean>,
   callOnLockScreen: SharedPreference<CallOnLockScreen>,
+  callDisableProximitySensor: SharedPreference<Boolean>,
   editIceServers: () -> Unit,
 ) {
   ColumnWithScrollBar {
@@ -46,6 +48,7 @@ fun CallSettingsLayout(
         val lockCallState = remember { mutableStateOf(callOnLockScreen.get()) }
         val enabled = remember { mutableStateOf(true) }
         LockscreenOpts(lockCallState, enabled, onSelected = { callOnLockScreen.set(it); lockCallState.value = it })
+        SettingsPreferenceItem(null, stringResource(MR.strings.call_disable_proximity_sensor), callDisableProximitySensor)
       }
       SettingsPreferenceItem(null, stringResource(MR.strings.always_use_relay), webrtcPolicyRelay)
     }
