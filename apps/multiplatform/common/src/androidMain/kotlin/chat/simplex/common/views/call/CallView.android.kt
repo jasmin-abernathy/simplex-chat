@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -131,6 +132,14 @@ actual fun ActiveCallView() {
     }
   }
   val disableProximitySensor = remember { appPrefs.callDisableProximitySensor.state }.value
+  val view = LocalView.current
+  val keepCallScreenOn = callState != null && !chatModel.activeCallViewIsCollapsed.value && disableProximitySensor
+  DisposableEffect(view, keepCallScreenOn) {
+    if (!keepCallScreenOn) return@DisposableEffect onDispose {}
+    val previousKeepScreenOn = view.keepScreenOn
+    view.keepScreenOn = true
+    onDispose { view.keepScreenOn = previousKeepScreenOn }
+  }
   LaunchedEffect(callState, chatModel.activeCallViewIsCollapsed.value, disableProximitySensor) {
     callState ?: return@LaunchedEffect
     try {
