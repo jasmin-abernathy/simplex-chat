@@ -1,0 +1,34 @@
+# Register the manual Android test workflow on the fork's default branch.
+# The complete implementation lives on feature branches such as
+# android/call-proximity-setting. When launching, select that branch.
+# This default-branch file intentionally does not build the app.
+name: android-emu
+
+on:
+  workflow_dispatch:
+    inputs:
+      claude:
+        description: Also run the Claude job (uses separate credentials)
+        type: boolean
+        default: false
+      backend:
+        description: Also start the test backend
+        type: boolean
+        default: false
+      release:
+        description: Also test the latest released app
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  select-feature-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Select the development branch
+        run: |
+          echo "This file registers the workflow in the fork."
+          echo "To compile, choose android/call-proximity-setting in Run workflow."
+          echo "The selected branch contains the full build and emulator jobs."
