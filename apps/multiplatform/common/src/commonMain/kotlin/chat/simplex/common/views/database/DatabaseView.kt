@@ -263,6 +263,48 @@ fun DatabaseManagementView() {
           iconColor = MaterialTheme.colors.primary,
           disabled = operationsDisabled
         )
+
+        if (appPlatform.isAndroid) {
+          SettingsActionItem(
+            painterResource(MR.images.ic_ios_share),
+            stringResource(MR.strings.rv_export_manual_title),
+            click = {
+              val blocked = VaultExportGate.check(
+                localDatabaseAvailable = m.localUserCreated.value == true,
+                encrypted = m.chatDbEncrypted.value,
+                initialRandomPassphrase = prefs.initialRandomDBPassphrase.get(),
+                remoteHostConnected = m.remoteHosts.any { it.sessionState is RemoteHostSessionState.Connected }
+              )
+              if (blocked != null) {
+                val reason = when (blocked) {
+                  VaultExportBlock.NO_LOCAL_DATABASE -> MR.strings.rv_export_no_local_database
+                  VaultExportBlock.DATABASE_ENCRYPTION_UNKNOWN -> MR.strings.rv_export_encryption_unknown
+                  VaultExportBlock.DATABASE_NOT_ENCRYPTED -> MR.strings.rv_export_database_unencrypted
+                  VaultExportBlock.PASSPHRASE_NOT_RECOVERABLE -> MR.strings.rv_export_passphrase_required
+                  VaultExportBlock.REMOTE_HOST_CONNECTED -> MR.strings.rv_export_disconnect_remote
+                }
+                AlertManager.shared.showAlertMsg(
+                  title = generalGetString(MR.strings.rv_export_manual_title),
+                  text = generalGetString(reason)
+                )
+              } else {
+                AlertManager.shared.showAlertMsg(
+                  title = generalGetString(MR.strings.rv_export_manual_title),
+                  text = generalGetString(MR.strings.rv_export_manual_notice),
+                  confirmText = generalGetString(MR.strings.rv_export_manual_confirm),
+                  onConfirm = {
+                    stopChatRunBlockStartChat(stopped, chatLastStart, progressIndicator) {
+                      exportArchive(m, progressIndicator, chatArchiveFile, saveArchiveLauncher, requireComplete = true)
+                    }
+                  }
+                )
+              }
+            },
+            textColor = MaterialTheme.colors.primary,
+            iconColor = MaterialTheme.colors.primary,
+            disabled = operationsDisabled
+          )
+        }
         SettingsActionItem(
           painterResource(MR.images.ic_download),
           stringResource(MR.strings.import_database),
@@ -598,7 +640,8 @@ private suspend fun exportArchive(
   m: ChatModel,
   progressIndicator: MutableState<Boolean>,
   chatArchiveFile: MutableState<String?>,
-  saveArchiveLauncher: FileChooserLauncher
+  saveArchiveLauncher: FileChooserLauncher,
+  requireComplete: Boolean = false
 ): Boolean {
   progressIndicator.value = true
   try {
@@ -606,6 +649,21 @@ private suspend fun exportArchive(
     chatArchiveFile.value = archiveFile
     if (archiveErrors.isEmpty()) {
       saveArchiveLauncher.launch(archiveFile.substringAfterLast(File.separator))
+    } else if (requireComplete && !VaultExportGate.canOfferArchive(archiveErrors.size)) {
+      // A partial export must not be presented as a usable recovery copy.
+      val removed = !File(archiveFile).exists() || File(archiveFile).delete()
+      if (removed) {
+        chatArchiveFile.value = null
+        m.controller.appPrefs.chatArchiveName.set(null)
+        m.controller.appPrefs.chatArchiveTime.set(null)
+      }
+      AlertManager.shared.showAlertMsg(
+        title = generalGetString(MR.strings.rv_export_manual_title),
+        text = generalGetString(
+          if (removed) MR.strings.rv_export_partial_rejected
+          else MR.strings.rv_export_partial_cleanup_failed
+        )
+      )
     } else {
       showArchiveExportedWithErrorsAlert(generalGetString(MR.strings.chat_database_exported_save), archiveErrors) {
         withLongRunningApi {
