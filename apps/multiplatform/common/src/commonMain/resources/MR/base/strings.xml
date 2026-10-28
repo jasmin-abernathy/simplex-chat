@@ -3212,7 +3212,7 @@
   <string name="badge_unknown_key_desc">The badge is signed with a key that this version of the app does not recognize. Update the app to verify this badge.</string>
   <!-- Resilience Vault: explicit manual archive handoff, no remote erasure -->
   <string name="rv_export_manual_title">Export for Resilience Vault (manual)</string>
-  <string name="rv_export_manual_notice">This creates a local ZIP using SimpleX's standard export. Choose a destination, then open Resilience Vault and select the ZIP. This does not encrypt the ZIP using the vault, upload it, verify that it can be restored, or erase SimpleX. Keep your database passphrase and delete any exposed temporary copies after a tested backup.</string>
+  <string name="rv_export_manual_notice">This creates a local ZIP using SimpleX\'s standard export. Choose a destination, then open Resilience Vault and select the ZIP. This does not encrypt the ZIP using the vault, upload it, verify that it can be restored, or erase SimpleX. Keep your database passphrase and delete any exposed temporary copies after a tested backup.</string>
   <string name="rv_export_manual_confirm">Export ZIP</string>
   <string name="rv_export_no_local_database">A local chat database is required.</string>
   <string name="rv_export_encryption_unknown">Database encryption status cannot be verified. Export blocked.</string>
