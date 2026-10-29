@@ -1,0 +1,112 @@
+name: Vault manual export test APK
+
+on:
+  push:
+    branches: [test/vault-apk-20261029]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vault-test-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: Build Android arm64 core from source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Build pinned native sources
+        run: bash scripts/ci/android/build-core.sh "$RUNNER_TEMP/android-core.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vault-test-native-core
+          path: ${{ runner.temp }}/android-core.tar.gz
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+
+  apk:
+    name: Build and verify isolated test APK
+    needs: core
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: vault-test-native-core
+          path: ${{ runner.temp }}/core
+      - name: Install native core
+        run: bash scripts/ci/android/install-core.sh "$RUNNER_TEMP/core/android-core.tar.gz"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install Android build tools
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            'platforms;android-35' 'build-tools;35.0.0' 'ndk;23.1.7779620' 'cmake;3.22.1'
+      - name: Use a separate test application
+        working-directory: apps/multiplatform
+        run: |
+          cat > local.properties <<'PROPERTIES'
+          application_id.suffix=.vaulttest
+          app.name=SimpleX Vault Test
+          PROPERTIES
+      - name: Tests and test APK
+        working-directory: apps/multiplatform
+        run: |
+          ./gradlew --no-daemon --max-workers=1 \
+            -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" \
+            -Pkotlin.compiler.execution.strategy=in-process \
+            -Pandroid.injected.build.abi=arm64-v8a \
+            :common:desktopTest :android:testFossDebugUnitTest :android:assembleFossDebug
+      - name: Verify identity, native code and signature
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          apk=apps/multiplatform/android/build/intermediates/apk/foss/debug/android-foss-arm64-v8a-debug.apk
+          test -f "$apk"
+          tools="$ANDROID_HOME/build-tools/35.0.0"
+          mkdir -p "$RUNNER_TEMP/apk"
+          "$tools/aapt" dump badging "$apk" > "$RUNNER_TEMP/apk/package.txt"
+          grep -q "^package: name='chat.simplex.app.vaulttest'" "$RUNNER_TEMP/apk/package.txt"
+          "$tools/apksigner" verify --verbose --print-certs "$apk" > "$RUNNER_TEMP/apk/signature.txt"
+          unzip -l "$apk" > "$RUNNER_TEMP/apk/contents.txt"
+          for library in libapp-lib.so libsimplex.so libsupport.so; do
+            grep -q "lib/arm64-v8a/$library" "$RUNNER_TEMP/apk/contents.txt"
+          done
+          cp "$apk" "$RUNNER_TEMP/apk/SimpleX-Vault-Test-arm64.apk"
+          printf '%s\n' "$SOURCE_SHA" > "$RUNNER_TEMP/apk/source-commit.txt"
+          (cd "$RUNNER_TEMP/apk" && sha256sum SimpleX-Vault-Test-arm64.apk > SHA256SUMS)
+      - name: Upload verified test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-app
+          path: ${{ runner.temp }}/apk/
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+      - name: Test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vault-apk-test-reports
+          path: |
+            apps/multiplatform/common/build/reports/tests/
+            apps/multiplatform/common/build/test-results/
+            apps/multiplatform/android/build/reports/tests/
+            apps/multiplatform/android/build/test-results/
+          if-no-files-found: warn
