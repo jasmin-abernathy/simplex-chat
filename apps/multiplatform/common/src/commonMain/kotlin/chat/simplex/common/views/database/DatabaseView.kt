@@ -37,6 +37,8 @@ import java.util.*
 import kotlin.collections.ArrayList
 import kotlinx.coroutines.*
 
+val vaultExportStore by lazy { VaultExportStore(databaseExportDir) }
+
 @Composable
 fun DatabaseView() {
   val m = chatModel
@@ -198,6 +200,40 @@ fun DatabaseManagementView() {
       chatArchiveFile.value = null
     }
   }
+  val vaultArchiveFile = remember { mutableStateOf<String?>(null) }
+  val vaultCopying = remember { mutableStateOf(false) }
+  val saveVaultArchiveLauncher = rememberFileChooserLauncher(false) { to: URI? ->
+    val archive = vaultArchiveFile.value
+    if (archive != null) {
+      vaultCopying.value = true
+      progressIndicator.value = true
+      withLongRunningApi {
+        try {
+          val result = withContext(Dispatchers.IO) {
+            finishVaultExportCopy(
+              File(archive), vaultExportStore::removeArchive,
+              openDestination = to?.let { destination -> { destination.outputStream() } }
+            )
+          }
+          if (result.temporaryRemoved) vaultArchiveFile.value = null
+          val message = when {
+            !result.temporaryRemoved -> MR.strings.rv_export_copy_cleanup_failed
+            result.status == VaultExportCopyStatus.FAILED -> MR.strings.rv_export_copy_failed
+            result.status == VaultExportCopyStatus.SAVED -> MR.strings.rv_export_copy_saved
+            else -> null
+          }
+          if (message != null) {
+            AlertManager.shared.showAlertMsg(
+              generalGetString(MR.strings.rv_export_manual_title), generalGetString(message)
+            )
+          }
+        } finally {
+          vaultCopying.value = false
+          progressIndicator.value = false
+        }
+      }
+    }
+  }
   val appFilesCountAndSize = remember { mutableStateOf(directoryFileCountAndSize(appFilesDir.absolutePath)) }
   val importArchiveLauncher = rememberFileChooserLauncher(true) { to: URI? ->
     if (to != null) {
@@ -208,7 +244,7 @@ fun DatabaseManagementView() {
       }
     }
   }
-  val operationsDisabled = progressIndicator.value && !m.desktopNoUserNoRemote
+  val operationsDisabled = (progressIndicator.value || vaultCopying.value || vaultArchiveFile.value != null) && !m.desktopNoUserNoRemote
 
   Box(Modifier.fillMaxSize()) {
     ColumnWithScrollBar {
@@ -263,6 +299,39 @@ fun DatabaseManagementView() {
           iconColor = MaterialTheme.colors.primary,
           disabled = operationsDisabled
         )
+
+        if (appPlatform.isAndroid) {
+          SettingsActionItem(
+            painterResource(MR.images.ic_ios_share),
+            stringResource(MR.strings.rv_export_manual_title),
+            click = {
+              val previous = vaultArchiveFile.value
+              if (previous != null && !vaultExportStore.removeArchive(File(previous))) {
+                AlertManager.shared.showAlertMsg(
+                  generalGetString(MR.strings.rv_export_manual_title),
+                  generalGetString(MR.strings.rv_export_copy_cleanup_failed)
+                )
+              } else {
+                vaultArchiveFile.value = null
+                if (allowVaultExport(m)) {
+                  AlertManager.shared.showAlertMsg(
+                    title = generalGetString(MR.strings.rv_export_manual_title),
+                    text = generalGetString(MR.strings.rv_export_manual_notice),
+                    confirmText = generalGetString(MR.strings.rv_export_manual_confirm),
+                    onConfirm = {
+                      stopChatRunBlockStartChat(stopped, chatLastStart, progressIndicator) {
+                        exportArchive(m, progressIndicator, vaultArchiveFile, saveVaultArchiveLauncher, requireComplete = true)
+                      }
+                    }
+                  )
+                }
+              }
+            },
+            textColor = MaterialTheme.colors.primary,
+            iconColor = MaterialTheme.colors.primary,
+            disabled = progressIndicator.value || vaultCopying.value
+          )
+        }
         SettingsActionItem(
           painterResource(MR.images.ic_download),
           stringResource(MR.strings.import_database),
@@ -594,18 +663,56 @@ fun deleteChatDatabaseFilesAndState() {
   ntfManager.cancelAllNotifications()
 }
 
+private fun allowVaultExport(m: ChatModel): Boolean {
+  val blocked = VaultExportGate.check(
+    localDatabaseAvailable = m.localUserCreated.value == true,
+    encrypted = m.chatDbEncrypted.value,
+    initialRandomPassphrase = m.controller.appPrefs.initialRandomDBPassphrase.get(),
+    remoteHostConnected = m.remoteHosts.any { it.sessionState is RemoteHostSessionState.Connected }
+  ) ?: return true
+  val reason = when (blocked) {
+    VaultExportBlock.NO_LOCAL_DATABASE -> MR.strings.rv_export_no_local_database
+    VaultExportBlock.DATABASE_ENCRYPTION_UNKNOWN -> MR.strings.rv_export_encryption_unknown
+    VaultExportBlock.DATABASE_NOT_ENCRYPTED -> MR.strings.rv_export_database_unencrypted
+    VaultExportBlock.PASSPHRASE_NOT_RECOVERABLE -> MR.strings.rv_export_passphrase_required
+    VaultExportBlock.REMOTE_HOST_CONNECTED -> MR.strings.rv_export_disconnect_remote
+  }
+  AlertManager.shared.showAlertMsg(
+    title = generalGetString(MR.strings.rv_export_manual_title),
+    text = generalGetString(reason)
+  )
+  return false
+}
+
 private suspend fun exportArchive(
   m: ChatModel,
   progressIndicator: MutableState<Boolean>,
   chatArchiveFile: MutableState<String?>,
-  saveArchiveLauncher: FileChooserLauncher
+  saveArchiveLauncher: FileChooserLauncher,
+  requireComplete: Boolean = false
 ): Boolean {
+  // Confirmation and authentication can suspend the flow: read the current state again.
+  if (requireComplete && !allowVaultExport(m)) return true
   progressIndicator.value = true
   try {
-    val (archiveFile, archiveErrors) = exportChatArchive(m, null, chatArchiveFile)
+    val (archiveFile, archiveErrors) = exportChatArchive(m, null, chatArchiveFile, temporary = requireComplete)
     chatArchiveFile.value = archiveFile
     if (archiveErrors.isEmpty()) {
       saveArchiveLauncher.launch(archiveFile.substringAfterLast(File.separator))
+    } else if (requireComplete && !VaultExportGate.canOfferArchive(archiveErrors.size)) {
+      // A partial export must not be presented as a usable recovery copy.
+      val removed = vaultExportStore.removeArchive(File(archiveFile))
+      if (removed) {
+        chatArchiveFile.value = null
+      }
+      AlertManager.shared.showAlertMsg(
+        title = generalGetString(MR.strings.rv_export_manual_title),
+        text = generalGetString(
+          if (removed) MR.strings.rv_export_partial_rejected
+          else MR.strings.rv_export_partial_cleanup_failed
+        )
+      )
+      return true
     } else {
       showArchiveExportedWithErrorsAlert(generalGetString(MR.strings.chat_database_exported_save), archiveErrors) {
         withLongRunningApi {
@@ -613,31 +720,65 @@ private suspend fun exportArchive(
         }
       }
     }
-    progressIndicator.value = false
   } catch (e: Throwable) {
-    AlertManager.shared.showAlertMsg(generalGetString(MR.strings.error_exporting_chat_database), e.toString())
+    val cleanupFailed = if (requireComplete && chatArchiveFile.value != null) {
+      val removed = vaultExportStore.removeArchive(File(chatArchiveFile.value!!))
+      if (removed) chatArchiveFile.value = null
+      !removed
+    } else {
+      e is VaultExportCleanupException || e.suppressed.any { it is VaultExportCleanupException }
+    }
+    if (cleanupFailed) {
+      AlertManager.shared.showAlertMsg(
+        generalGetString(MR.strings.rv_export_manual_title),
+        generalGetString(MR.strings.rv_export_exception_cleanup_failed)
+      )
+    } else if (e !is CancellationException) {
+      AlertManager.shared.showAlertMsg(
+        generalGetString(MR.strings.error_exporting_chat_database),
+        if (requireComplete) generalGetString(MR.strings.rv_export_failed) else e.toString()
+      )
+    }
+    if (e is CancellationException) throw e
+    // Rejected vault attempts must not leave a previously running chat stopped.
+    if (requireComplete) return true
+  } finally {
     progressIndicator.value = false
   }
-  return false
+  // The ZIP is now a snapshot: the chooser/copy no longer needs the chat stopped.
+  return requireComplete
 }
 
 suspend fun exportChatArchive(
   m: ChatModel,
   storagePath: File?,
-  chatArchiveFile: MutableState<String?>
+  chatArchiveFile: MutableState<String?>,
+  temporary: Boolean = false
 ): Pair<String, List<ArchiveError>> {
   val archiveTime = Clock.System.now()
   val ts = SimpleDateFormat("yyyy-MM-dd'T'HHmmss", Locale.US).format(Date.from(archiveTime.toJavaInstant()))
   val archiveName = "simplex-chat.$ts.zip"
-  val archivePath = "${(storagePath ?: databaseExportDir).absolutePath}${File.separator}$archiveName"
-  val config = ArchiveConfig(archivePath, parentTempDirectory = databaseExportDir.toString())
-  // Settings should be saved before changing a passphrase, otherwise the database needs to be migrated first
-  if (!m.chatDbChanged.value) {
-    controller.apiSaveAppSettings(AppSettings.current.prepareForExport())
+  val archive = if (temporary) vaultExportStore.createArchive() else File(storagePath ?: databaseExportDir, archiveName)
+  val archivePath = archive.absolutePath
+  // Register the path before settings or the engine can fail; the directory survives process death.
+  if (temporary) chatArchiveFile.value = archivePath
+  val config = ArchiveConfig(
+    archivePath, parentTempDirectory = if (temporary) archive.parent else databaseExportDir.toString()
+  )
+  suspend fun createArchive(): List<ArchiveError> {
+    // Save settings before export; any failure must clean this attempt's ZIP.
+    if (!m.chatDbChanged.value) {
+      controller.apiSaveAppSettings(AppSettings.current.prepareForExport())
+    }
+    wallpapersDir.mkdirs()
+    return m.controller.apiExportArchive(config)
   }
-  wallpapersDir.mkdirs()
-  val archiveErrors = m.controller.apiExportArchive(config)
-  if (storagePath == null) {
+  val archiveErrors = if (temporary) {
+    runVaultExportAttempt(archive, vaultExportStore::removeArchive) { createArchive() }
+  } else {
+    createArchive()
+  }
+  if (storagePath == null && !temporary) {
     deleteOldChatArchive()
     m.controller.appPrefs.chatArchiveName.set(archiveName)
     m.controller.appPrefs.chatArchiveTime.set(archiveTime)

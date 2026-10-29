@@ -1,0 +1,46 @@
+name: vault-export-checks
+
+on:
+  push:
+    branches: [feature/resilience-vault-handoff-20261028]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vault-export-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kotlin-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Desktop tests and Android compilation
+        working-directory: apps/multiplatform
+        run: |
+          ./gradlew --no-daemon --max-workers=1 \
+            -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" \
+            -Pkotlin.compiler.execution.strategy=in-process \
+            :common:desktopTest :android:compileFossDebugKotlin :android:testFossDebugUnitTest
+      - name: Test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vault-export-test-reports
+          path: |
+            apps/multiplatform/common/build/reports/tests/
+            apps/multiplatform/common/build/test-results/
+            apps/multiplatform/android/build/reports/tests/
+            apps/multiplatform/android/build/test-results/
+          if-no-files-found: warn

@@ -2444,4 +2444,20 @@
     <string name="share_group_profile_via_link_alert_text">Le lien sera court, et le profil de groupe sera partagé via le lien.</string>
     <string name="the_sender_will_not_be_notified">L\'expéditeur n\'en sera PAS informé.</string>
     <string name="this_setting_is_for_your_current_profile">Ce réglage est pour votre profil actuel</string>
+    <!-- Resilience Vault : transfert manuel explicite, sans effacement à distance -->
+    <string name="rv_export_manual_title">Exporter pour Resilience Vault (manuel)</string>
+    <string name="rv_export_manual_notice">Un ZIP local sera créé par l\'export habituel de SimpleX. Choisissez sa destination, puis ouvrez Resilience Vault et sélectionnez ce ZIP. Cette action ne chiffre pas le ZIP avec le coffre, ne l\'envoie pas en ligne, ne vérifie pas sa restauration et n\'efface pas SimpleX. Conservez votre phrase secrète et supprimez les copies temporaires exposées après avoir testé la sauvegarde.</string>
+    <string name="rv_export_manual_confirm">Exporter le ZIP</string>
+    <string name="rv_export_no_local_database">Une base de données locale est nécessaire.</string>
+    <string name="rv_export_encryption_unknown">Impossible de vérifier le chiffrement de la base. Export bloqué.</string>
+    <string name="rv_export_database_unencrypted">Chiffrez la base locale avant de préparer un export pour le coffre distant.</string>
+    <string name="rv_export_passphrase_required">Définissez et conservez votre propre phrase secrète pour la base avant l\'export. La phrase secrète aléatoire initiale ne suffit pas à la récupération.</string>
+    <string name="rv_export_disconnect_remote">Déconnectez les hôtes distants avant d\'exporter une archive locale.</string>
+    <string name="rv_export_partial_rejected">L\'export a signalé des erreurs. L\'archive incomplète n\'a pas été proposée. Sa copie temporaire a été supprimée.</string>
+    <string name="rv_export_partial_cleanup_failed">L\'export a signalé des erreurs. L\'archive incomplète n\'a pas été proposée, mais son fichier temporaire n\'a pas pu être supprimé. Retirez-le manuellement avant de continuer.</string>
+  <string name="rv_export_exception_cleanup_failed">L’export a échoué et son archive temporaire n’a pas pu être supprimée. Aucune archive n’a été proposée. Supprimez la copie temporaire avant de continuer.</string>
+  <string name="rv_export_copy_saved">Le ZIP a été enregistré et sa copie temporaire supprimée. Cela ne vérifie ni le chiffrement par le coffre, ni le transfert, ni la restauration.</string>
+  <string name="rv_export_copy_failed">Le ZIP n’a pas pu être enregistré. Sa copie temporaire a été supprimée. La destination choisie peut contenir un fichier incomplet : supprimez-le avant de réessayer.</string>
+  <string name="rv_export_copy_cleanup_failed">Le ZIP temporaire n’a pas pu être supprimé. La copie n’est pas confirmée comme complète. La destination choisie peut contenir un fichier incomplet. Relancez l’action d’export pour retenter le nettoyage avant de créer une autre archive.</string>
+  <string name="rv_export_failed">L’export a échoué. Aucune archive n’a été proposée à l’enregistrement.</string>
 </resources>
