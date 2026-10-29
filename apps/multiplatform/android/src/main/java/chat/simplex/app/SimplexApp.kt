@@ -28,6 +28,7 @@ import chat.simplex.common.platform.*
 import chat.simplex.common.ui.theme.*
 import chat.simplex.common.views.call.*
 import chat.simplex.common.views.database.deleteOldChatArchive
+import chat.simplex.common.views.database.vaultExportStore
 import chat.simplex.common.views.helpers.*
 import chat.simplex.common.views.onboarding.OnboardingStage
 import com.jakewharton.processphoenix.ProcessPhoenix
@@ -70,6 +71,13 @@ class SimplexApp: Application(), LifecycleEventObserver {
     context = this
     initHaskell(packageName)
     initMultiplatform()
+    withLongRunningApi {
+      withContext(Dispatchers.IO) {
+        if (!vaultExportStore.recoverInterrupted()) {
+          Log.e(TAG, "Interrupted vault export cleanup failed; new vault exports remain blocked until cleanup succeeds")
+        }
+      }
+    }
     reconfigureBroadcastReceivers()
     runMigrations()
     tmpDir.deleteRecursively()

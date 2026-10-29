@@ -12,7 +12,7 @@
 Ces changements ne constituent pas une validation fonctionnelle ou de sécurité du parcours complet.
 
 - Le parcours autorise maintenant la reprise du chat dès la création du ZIP complet. La reprise effective et les interactions avec le sélecteur restent à tester sur téléphone.
-- Les exceptions du moteur, y compris une annulation de coroutine, déclenchent maintenant une tentative de suppression du ZIP de cette tentative. Un échec de suppression est signalé sans remplacer l’erreur initiale. Un processus tué ne passe pas par ce nettoyage : il exige toujours un inventaire durable et un nettoyage de reprise limité à cet inventaire.
+- Les exceptions du moteur, y compris une annulation de coroutine, déclenchent maintenant une tentative de suppression du ZIP de cette tentative. Un échec de suppression est signalé sans remplacer l’erreur initiale. Un processus tué ne passe pas par ce nettoyage immédiat ; les nouvelles tentatives sont désormais inventoriées par leurs répertoires privés et nettoyées au démarrage suivant (voir la reprise ci-dessous).
 - Le parcours du coffre utilise maintenant un sélecteur distinct et propage le résultat de copie et de nettoyage. Les tests de flux couvrent les erreurs d’écriture et de fermeture ; les fournisseurs SAF réels, le stockage plein et les changements de cycle de vie Android restent à tester.
 - La vérification des préconditions n’est pas un verrou transactionnel contre un changement concurrent pendant l’export.
 - La compilation Kotlin et les tests JVM ne produisent pas un APK exécutable. L’assemblage exige les bibliothèques natives SimpleX/support correspondant à cette révision ; aucun binaire d’une version arbitraire ne doit être substitué.
@@ -49,4 +49,16 @@ Menace couverte : un fournisseur de documents peut refuser l’accès ou échoue
 
 La reprise du chat est demandée dès que le ZIP est prêt ; il s’agit d’un instantané indépendant de la base courante. Le parcours d’export habituel est conservé.
 
-Toujours bloquants : validation Android du nouveau commit, interruption du processus et inventaire durable, concurrence des changements de base, assemblage avec les bibliothèques natives correspondantes et essais SAF/restauration sur deux appareils. L’intégration de chiffrement et de récupération RV reste distincte ; aucun effacement coopératif n’est activé.
+Toujours bloquants : validation Android du nouveau commit, vérification sur appareil du nettoyage de reprise, concurrence des changements de base, assemblage avec les bibliothèques natives correspondantes et essais SAF/restauration sur deux appareils. L’intégration de chiffrement et de récupération RV reste distincte ; aucun effacement coopératif n’est activé.
+
+## Nettoyage de reprise après arrêt du processus
+
+Les nouvelles tentatives sont isolées dans `cacheDir/vault-exports-v1/<UUID>/`. Ce répertoire est créé avant l’écriture du ZIP ; il constitue l’inventaire persistant de la tentative. Le répertoire de travail du moteur d’archive est également placé dans cette tentative.
+
+Au démarrage du processus Android principal, après initialisation du contexte multiplateforme, le nettoyage est programmé hors du thread UI. Toute création d’export exige d’abord la réussite de ce nettoyage. Un seul balayage réussi est permis par instance du stockage : un déclenchement tardif ne peut pas supprimer un nouvel export actif. Le nettoyage parcourt uniquement les répertoires UUID de cet espace. Il supprime leur contenu sans suivre les liens symboliques. Une racine ou une tentative redirigée par un lien est refusée. Les noms inconnus et les archives extérieures à cet espace sont préservés. Un échec bloque la création de nouveaux exports jusqu’à ce que le nettoyage puisse aboutir ; les autres fonctions de messagerie continuent de démarrer.
+
+Les mêmes suppressions limitées à une tentative sont utilisées après copie, annulation ou erreur du moteur. Supprimer une tentative ne touche pas une autre tentative active. Les fichiers créés par les versions précédentes dans la racine du cache ne sont pas revendiqués ni supprimés par ce mécanisme : leur nettoyage reste manuel faute d’inventaire fiable.
+
+Validation ciblée : **29 tests JVM réussis** au total, dont onze tests du stockage et de la reprise (répertoire vide, ZIP partiel, fichiers de travail imbriqués, redémarrage simulé, idempotence, tentatives distinctes, chemins extérieurs, racine invalide et liens symboliques). Il s’agit de simulations sur système de fichiers ; un arrêt forcé et un redémarrage Android réels restent à vérifier. Les suppressions sont logiques et ne constituent pas une garantie d’effacement physique sur mémoire flash.
+
+Le commit précédent `591eaee6dd07e962de3e04655bb17996b74f4c9e` a passé compilation Android, tests desktop et tests unitaires Android dans le run `40851744594`. Cette validation précède l’ajout du nettoyage de reprise et ne valide pas ce nouveau code. La compilation du nouveau commit doit être vérifiée séparément.

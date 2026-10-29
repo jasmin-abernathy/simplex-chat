@@ -35,7 +35,7 @@ class VaultExportCopyTest {
   }
 
   @Test fun cancelledChooserRemovesTheTemporary() = withArchive { archive, _ ->
-    assertEquals(VaultExportCopyResult(VaultExportCopyStatus.CANCELLED, true), finishVaultExportCopy(archive, null))
+    assertEquals(VaultExportCopyResult(VaultExportCopyStatus.CANCELLED, true), finishVaultExportCopy(archive, openDestination = null))
     assertFalse(archive.exists())
   }
 

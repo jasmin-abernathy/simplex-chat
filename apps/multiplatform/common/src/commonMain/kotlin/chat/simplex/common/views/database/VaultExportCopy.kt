@@ -16,7 +16,11 @@ fun removeVaultExportArchive(archive: File): Boolean = try {
 }
 
 /** Closing the provider stream is part of the copy, not evidence of a recoverable backup. */
-fun finishVaultExportCopy(archive: File, openDestination: (() -> OutputStream)?): VaultExportCopyResult {
+fun finishVaultExportCopy(
+  archive: File,
+  cleanup: (File) -> Boolean = ::removeVaultExportArchive,
+  openDestination: (() -> OutputStream)?
+): VaultExportCopyResult {
   var removed = false
   val status = try {
     if (openDestination == null) {
@@ -31,7 +35,7 @@ fun finishVaultExportCopy(archive: File, openDestination: (() -> OutputStream)?)
     if (e is CancellationException) throw e
     VaultExportCopyStatus.FAILED
   } finally {
-    removed = removeVaultExportArchive(archive)
+    removed = cleanup(archive)
   }
   return VaultExportCopyResult(status, removed)
 }

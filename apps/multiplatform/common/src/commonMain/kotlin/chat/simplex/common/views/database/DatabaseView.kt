@@ -37,6 +37,8 @@ import java.util.*
 import kotlin.collections.ArrayList
 import kotlinx.coroutines.*
 
+val vaultExportStore by lazy { VaultExportStore(databaseExportDir) }
+
 @Composable
 fun DatabaseView() {
   val m = chatModel
@@ -208,7 +210,10 @@ fun DatabaseManagementView() {
       withLongRunningApi {
         try {
           val result = withContext(Dispatchers.IO) {
-            finishVaultExportCopy(File(archive), to?.let { destination -> { destination.outputStream() } })
+            finishVaultExportCopy(
+              File(archive), vaultExportStore::removeArchive,
+              openDestination = to?.let { destination -> { destination.outputStream() } }
+            )
           }
           if (result.temporaryRemoved) vaultArchiveFile.value = null
           val message = when {
@@ -301,7 +306,7 @@ fun DatabaseManagementView() {
             stringResource(MR.strings.rv_export_manual_title),
             click = {
               val previous = vaultArchiveFile.value
-              if (previous != null && !removeVaultExportArchive(File(previous))) {
+              if (previous != null && !vaultExportStore.removeArchive(File(previous))) {
                 AlertManager.shared.showAlertMsg(
                   generalGetString(MR.strings.rv_export_manual_title),
                   generalGetString(MR.strings.rv_export_copy_cleanup_failed)
@@ -696,7 +701,7 @@ private suspend fun exportArchive(
       saveArchiveLauncher.launch(archiveFile.substringAfterLast(File.separator))
     } else if (requireComplete && !VaultExportGate.canOfferArchive(archiveErrors.size)) {
       // A partial export must not be presented as a usable recovery copy.
-      val removed = removeVaultExportArchive(File(archiveFile))
+      val removed = vaultExportStore.removeArchive(File(archiveFile))
       if (removed) {
         chatArchiveFile.value = null
       }
@@ -716,7 +721,14 @@ private suspend fun exportArchive(
       }
     }
   } catch (e: Throwable) {
-    if (e.suppressed.any { it is VaultExportCleanupException }) {
+    val cleanupFailed = if (requireComplete && chatArchiveFile.value != null) {
+      val removed = vaultExportStore.removeArchive(File(chatArchiveFile.value!!))
+      if (removed) chatArchiveFile.value = null
+      !removed
+    } else {
+      e is VaultExportCleanupException || e.suppressed.any { it is VaultExportCleanupException }
+    }
+    if (cleanupFailed) {
       AlertManager.shared.showAlertMsg(
         generalGetString(MR.strings.rv_export_manual_title),
         generalGetString(MR.strings.rv_export_exception_cleanup_failed)
@@ -745,10 +757,14 @@ suspend fun exportChatArchive(
 ): Pair<String, List<ArchiveError>> {
   val archiveTime = Clock.System.now()
   val ts = SimpleDateFormat("yyyy-MM-dd'T'HHmmss", Locale.US).format(Date.from(archiveTime.toJavaInstant()))
-  // A vault attempt must never overwrite or retire a previous recovery archive.
-  val archiveName = if (temporary) "simplex-chat.$ts.${UUID.randomUUID()}.zip" else "simplex-chat.$ts.zip"
-  val archivePath = "${(storagePath ?: databaseExportDir).absolutePath}${File.separator}$archiveName"
-  val config = ArchiveConfig(archivePath, parentTempDirectory = databaseExportDir.toString())
+  val archiveName = "simplex-chat.$ts.zip"
+  val archive = if (temporary) vaultExportStore.createArchive() else File(storagePath ?: databaseExportDir, archiveName)
+  val archivePath = archive.absolutePath
+  // Register the path before settings or the engine can fail; the directory survives process death.
+  if (temporary) chatArchiveFile.value = archivePath
+  val config = ArchiveConfig(
+    archivePath, parentTempDirectory = if (temporary) archive.parent else databaseExportDir.toString()
+  )
   suspend fun createArchive(): List<ArchiveError> {
     // Save settings before export; any failure must clean this attempt's ZIP.
     if (!m.chatDbChanged.value) {
@@ -758,7 +774,7 @@ suspend fun exportChatArchive(
     return m.controller.apiExportArchive(config)
   }
   val archiveErrors = if (temporary) {
-    runVaultExportAttempt(File(archivePath)) { createArchive() }
+    runVaultExportAttempt(archive, vaultExportStore::removeArchive) { createArchive() }
   } else {
     createArchive()
   }
