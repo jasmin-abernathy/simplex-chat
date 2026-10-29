@@ -306,18 +306,20 @@ fun DatabaseManagementView() {
                   generalGetString(MR.strings.rv_export_manual_title),
                   generalGetString(MR.strings.rv_export_copy_cleanup_failed)
                 )
-              } else if (allowVaultExport(m)) {
+              } else {
                 vaultArchiveFile.value = null
-                AlertManager.shared.showAlertMsg(
-                  title = generalGetString(MR.strings.rv_export_manual_title),
-                  text = generalGetString(MR.strings.rv_export_manual_notice),
-                  confirmText = generalGetString(MR.strings.rv_export_manual_confirm),
-                  onConfirm = {
-                    stopChatRunBlockStartChat(stopped, chatLastStart, progressIndicator) {
-                      exportArchive(m, progressIndicator, vaultArchiveFile, saveVaultArchiveLauncher, requireComplete = true)
+                if (allowVaultExport(m)) {
+                  AlertManager.shared.showAlertMsg(
+                    title = generalGetString(MR.strings.rv_export_manual_title),
+                    text = generalGetString(MR.strings.rv_export_manual_notice),
+                    confirmText = generalGetString(MR.strings.rv_export_manual_confirm),
+                    onConfirm = {
+                      stopChatRunBlockStartChat(stopped, chatLastStart, progressIndicator) {
+                        exportArchive(m, progressIndicator, vaultArchiveFile, saveVaultArchiveLauncher, requireComplete = true)
+                      }
                     }
-                  }
-                )
+                  )
+                }
               }
             },
             textColor = MaterialTheme.colors.primary,
