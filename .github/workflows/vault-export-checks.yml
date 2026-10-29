@@ -28,7 +28,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Desktop tests and Android compilation
         working-directory: apps/multiplatform
-        run: ./gradlew --no-daemon :common:desktopTest :android:compileFossDebugKotlin :android:testFossDebugUnitTest
+        run: |
+          ./gradlew --no-daemon --max-workers=1 \
+            -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" \
+            -Pkotlin.compiler.execution.strategy=in-process \
+            :common:desktopTest :android:compileFossDebugKotlin :android:testFossDebugUnitTest
       - name: Test reports
         if: always()
         uses: actions/upload-artifact@v4

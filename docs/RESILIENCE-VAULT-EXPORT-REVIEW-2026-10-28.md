@@ -11,9 +11,9 @@
 
 Ces changements ne constituent pas une validation fonctionnelle ou de sécurité du parcours complet.
 
-- Le chat reste arrêté après un export accepté, selon le parcours historique. Définir et tester sa reprise après copie/annulation.
+- Le parcours autorise maintenant la reprise du chat dès la création du ZIP complet. La reprise effective et les interactions avec le sélecteur restent à tester sur téléphone.
 - Les exceptions du moteur, y compris une annulation de coroutine, déclenchent maintenant une tentative de suppression du ZIP de cette tentative. Un échec de suppression est signalé sans remplacer l’erreur initiale. Un processus tué ne passe pas par ce nettoyage : il exige toujours un inventaire durable et un nettoyage de reprise limité à cet inventaire.
-- Le sélecteur partagé ignore le résultat de suppression du temporaire et ne propage pas le résultat de copie. Tester stockage plein, fournisseur SAF en erreur, annulation et échec de suppression avant de qualifier ce parcours de fiable.
+- Le parcours du coffre utilise maintenant un sélecteur distinct et propage le résultat de copie et de nettoyage. Les tests de flux couvrent les erreurs d’écriture et de fermeture ; les fournisseurs SAF réels, le stockage plein et les changements de cycle de vie Android restent à tester.
 - La vérification des préconditions n’est pas un verrou transactionnel contre un changement concurrent pendant l’export.
 - La compilation Kotlin et les tests JVM ne produisent pas un APK exécutable. L’assemblage exige les bibliothèques natives SimpleX/support correspondant à cette révision ; aucun binaire d’une version arbitraire ne doit être substitué.
 - La transmission locale à RV, le chiffrement avant réseau, le manifeste authentifié et le commit distant restent à réaliser et auditer.
@@ -36,3 +36,17 @@ Le lancement build 40673573479 concerne la branche android/call-proximity-settin
 - Validation locale : compilation Kotlin 2.1.20 et exécution JUnit 4.13.2 des classes `VaultExportAttemptTest` et `VaultExportGateTest` : **10 tests réussis**, dont six cas de cycle de vie de fichier et les 24 combinaisons de préconditions.
 - Le run Android précédent `40709173334` a été annulé à la limite de 35 minutes pendant `:common:compileDebugKotlinAndroid`, sans rapport de test. Il ne constitue pas une validation Android.
 - Toujours ouverts : copie SAF, annulation du sélecteur, nettoyage après processus tué, reprise après export accepté, restauration physique et intégration RV complète.
+
+## Reprise du 29 octobre — copie et mémoire de compilation
+
+Le run `40751851575` a échoué dans les compilations Kotlin Android et desktop avec `OutOfMemoryError: GC overhead limit exceeded`, avant les tests. Le workflow limite maintenant les workers à un et compile Kotlin dans le processus Gradle, doté de 5 Gio de heap, sans augmenter les exigences des compilations locales.
+
+Le sélecteur du coffre dispose de son propre état. La copie s’exécute hors du thread UI ; son résultat n’est positif qu’après fermeture du flux de destination. Une erreur d’ouverture, d’écriture ou de fermeture est signalée sans chemin ou exception brute. La copie temporaire est nettoyée après succès, annulation ou échec. Si ce nettoyage échoue, le chemin reste suivi et une nouvelle tentative d’export retente le nettoyage avant de créer une archive. Les autres opérations de base sont désactivées tant que ce fichier est en attente.
+
+Huit tests supplémentaires couvrent copie complète, annulation, permission révoquée, stockage plein, erreur de fermeture du fournisseur, source disparue, suppression refusée et propagation d’une annulation. Chaque scénario préserve une ancienne archive indépendante.
+
+Menace couverte : un fournisseur de documents peut refuser l’accès ou échouer pendant la copie. Une fermeture réussie ne prouve ni persistance distante, ni contenu authentique, ni restauration. Le fournisseur peut conserver une destination partielle en cas d’échec ; le message demande de la supprimer, sans effacer automatiquement un document externe dont la propriété ne peut pas être garantie.
+
+La reprise du chat est demandée dès que le ZIP est prêt ; il s’agit d’un instantané indépendant de la base courante. Le parcours d’export habituel est conservé.
+
+Toujours bloquants : validation Android du nouveau commit, interruption du processus et inventaire durable, concurrence des changements de base, assemblage avec les bibliothèques natives correspondantes et essais SAF/restauration sur deux appareils. L’intégration de chiffrement et de récupération RV reste distincte ; aucun effacement coopératif n’est activé.

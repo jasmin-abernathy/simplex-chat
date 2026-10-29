@@ -3222,4 +3222,8 @@
   <string name="rv_export_partial_rejected">The export reported errors. The incomplete archive was not offered for saving. Its temporary copy was removed.</string>
   <string name="rv_export_partial_cleanup_failed">The export reported errors. The incomplete archive was not offered for saving, but its temporary file could not be deleted. Remove it manually before continuing.</string>
   <string name="rv_export_exception_cleanup_failed">The export failed and its temporary archive could not be removed. No archive was offered for saving. Remove the temporary copy before continuing.</string>
+  <string name="rv_export_copy_saved">The ZIP was saved and its temporary copy removed. This does not verify encryption by the vault, upload, or restoration.</string>
+  <string name="rv_export_copy_failed">The ZIP could not be saved. Its temporary copy was removed. The selected destination may contain an incomplete file: remove it before trying again.</string>
+  <string name="rv_export_copy_cleanup_failed">The temporary ZIP could not be removed. The copy is not confirmed as complete. The selected destination may contain an incomplete file. Try the export action again to retry temporary-file cleanup before creating another archive.</string>
+  <string name="rv_export_failed">The export failed. No archive was offered for saving.</string>
 </resources>

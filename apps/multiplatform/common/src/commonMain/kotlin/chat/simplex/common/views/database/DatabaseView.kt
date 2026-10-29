@@ -198,6 +198,37 @@ fun DatabaseManagementView() {
       chatArchiveFile.value = null
     }
   }
+  val vaultArchiveFile = remember { mutableStateOf<String?>(null) }
+  val vaultCopying = remember { mutableStateOf(false) }
+  val saveVaultArchiveLauncher = rememberFileChooserLauncher(false) { to: URI? ->
+    val archive = vaultArchiveFile.value
+    if (archive != null) {
+      vaultCopying.value = true
+      progressIndicator.value = true
+      withLongRunningApi {
+        try {
+          val result = withContext(Dispatchers.IO) {
+            finishVaultExportCopy(File(archive), to?.let { destination -> { destination.outputStream() } })
+          }
+          if (result.temporaryRemoved) vaultArchiveFile.value = null
+          val message = when {
+            !result.temporaryRemoved -> MR.strings.rv_export_copy_cleanup_failed
+            result.status == VaultExportCopyStatus.FAILED -> MR.strings.rv_export_copy_failed
+            result.status == VaultExportCopyStatus.SAVED -> MR.strings.rv_export_copy_saved
+            else -> null
+          }
+          if (message != null) {
+            AlertManager.shared.showAlertMsg(
+              generalGetString(MR.strings.rv_export_manual_title), generalGetString(message)
+            )
+          }
+        } finally {
+          vaultCopying.value = false
+          progressIndicator.value = false
+        }
+      }
+    }
+  }
   val appFilesCountAndSize = remember { mutableStateOf(directoryFileCountAndSize(appFilesDir.absolutePath)) }
   val importArchiveLauncher = rememberFileChooserLauncher(true) { to: URI? ->
     if (to != null) {
@@ -208,7 +239,7 @@ fun DatabaseManagementView() {
       }
     }
   }
-  val operationsDisabled = progressIndicator.value && !m.desktopNoUserNoRemote
+  val operationsDisabled = (progressIndicator.value || vaultCopying.value || vaultArchiveFile.value != null) && !m.desktopNoUserNoRemote
 
   Box(Modifier.fillMaxSize()) {
     ColumnWithScrollBar {
@@ -269,14 +300,21 @@ fun DatabaseManagementView() {
             painterResource(MR.images.ic_ios_share),
             stringResource(MR.strings.rv_export_manual_title),
             click = {
-              if (allowVaultExport(m)) {
+              val previous = vaultArchiveFile.value
+              if (previous != null && !removeVaultExportArchive(File(previous))) {
+                AlertManager.shared.showAlertMsg(
+                  generalGetString(MR.strings.rv_export_manual_title),
+                  generalGetString(MR.strings.rv_export_copy_cleanup_failed)
+                )
+              } else if (allowVaultExport(m)) {
+                vaultArchiveFile.value = null
                 AlertManager.shared.showAlertMsg(
                   title = generalGetString(MR.strings.rv_export_manual_title),
                   text = generalGetString(MR.strings.rv_export_manual_notice),
                   confirmText = generalGetString(MR.strings.rv_export_manual_confirm),
                   onConfirm = {
                     stopChatRunBlockStartChat(stopped, chatLastStart, progressIndicator) {
-                      exportArchive(m, progressIndicator, chatArchiveFile, saveArchiveLauncher, requireComplete = true)
+                      exportArchive(m, progressIndicator, vaultArchiveFile, saveVaultArchiveLauncher, requireComplete = true)
                     }
                   }
                 )
@@ -284,7 +322,7 @@ fun DatabaseManagementView() {
             },
             textColor = MaterialTheme.colors.primary,
             iconColor = MaterialTheme.colors.primary,
-            disabled = operationsDisabled
+            disabled = progressIndicator.value || vaultCopying.value
           )
         }
         SettingsActionItem(
@@ -656,7 +694,7 @@ private suspend fun exportArchive(
       saveArchiveLauncher.launch(archiveFile.substringAfterLast(File.separator))
     } else if (requireComplete && !VaultExportGate.canOfferArchive(archiveErrors.size)) {
       // A partial export must not be presented as a usable recovery copy.
-      val removed = !File(archiveFile).exists() || File(archiveFile).delete()
+      val removed = removeVaultExportArchive(File(archiveFile))
       if (removed) {
         chatArchiveFile.value = null
       }
@@ -682,7 +720,10 @@ private suspend fun exportArchive(
         generalGetString(MR.strings.rv_export_exception_cleanup_failed)
       )
     } else if (e !is CancellationException) {
-      AlertManager.shared.showAlertMsg(generalGetString(MR.strings.error_exporting_chat_database), e.toString())
+      AlertManager.shared.showAlertMsg(
+        generalGetString(MR.strings.error_exporting_chat_database),
+        if (requireComplete) generalGetString(MR.strings.rv_export_failed) else e.toString()
+      )
     }
     if (e is CancellationException) throw e
     // Rejected vault attempts must not leave a previously running chat stopped.
@@ -690,7 +731,8 @@ private suspend fun exportArchive(
   } finally {
     progressIndicator.value = false
   }
-  return false
+  // The ZIP is now a snapshot: the chooser/copy no longer needs the chat stopped.
+  return requireComplete
 }
 
 suspend fun exportChatArchive(
