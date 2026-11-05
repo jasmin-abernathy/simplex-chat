@@ -1,0 +1,77 @@
+name: Verger embedded SimpleX prototype
+on:
+  workflow_dispatch:
+  push:
+    branches: [prototype/verger-embedded-20261105]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: verger-prototype
+  cancel-in-progress: true
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify cached native core matches source
+        run: git diff --exit-code 682e0b516be4e5852194a2a37e8267d82692dcf9 HEAD -- src cabal.project simplex-chat.cabal flake.nix flake.lock
+      - uses: actions/checkout@v6
+        with:
+          repository: jasmin-abernathy/verger-associations
+          ref: ed99ffc51dadbd3af9a193c5dc71d180bf658bc1
+          path: verger-source
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Test and bundle Verger
+        working-directory: verger-source/apps/verger-pwa
+        run: |
+          npm ci
+          npm run check
+          npm run build
+          mkdir -p ../../../apps/multiplatform/android/src/main/assets/verger
+          cp -R dist/. ../../../apps/multiplatform/android/src/main/assets/verger/
+      - uses: actions/download-artifact@v4
+        with:
+          name: vault-test-native-core
+          run-id: 40937013106
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/core
+      - name: Install verified source-built native libraries
+        run: bash scripts/ci/android/install-core.sh "$RUNNER_TEMP/core/android-core.tar.gz"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Android SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;23.1.7779620' 'cmake;3.22.1'
+      - name: Build one APK and run tests
+        working-directory: apps/multiplatform
+        run: |
+          printf 'application_id.suffix=.vergertest\napp.name=Verger SimpleX Prototype\n' > local.properties
+          ./gradlew --no-daemon --max-workers=1 -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" -Pkotlin.compiler.execution.strategy=in-process -Pandroid.injected.build.abi=arm64-v8a :common:desktopTest :android:testFossDebugUnitTest :android:assembleFossDebug
+      - name: Verify package, assets, native libraries and signature
+        run: |
+          mkdir -p deliverable
+          cp apps/multiplatform/android/build/intermediates/apk/foss/debug/android-foss-arm64-v8a-debug.apk deliverable/verger-simplex-prototype.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging deliverable/verger-simplex-prototype.apk | head -1 | grep "chat.simplex.app.vergertest"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify deliverable/verger-simplex-prototype.apk
+          unzip -l deliverable/verger-simplex-prototype.apk > "$RUNNER_TEMP/apk-files"
+          for entry in assets/verger/index.html lib/arm64-v8a/libapp-lib.so lib/arm64-v8a/libsimplex.so lib/arm64-v8a/libsupport.so; do grep -F "$entry" "$RUNNER_TEMP/apk-files"; done
+          printf 'SimpleX source: %s\nVerger source: ed99ffc51dadbd3af9a193c5dc71d180bf658bc1\n' "$GITHUB_SHA" > deliverable/SOURCES.txt
+          cp docs/VERGER-PROTOTYPE.md deliverable/README.md
+          cd deliverable
+          sha256sum verger-simplex-prototype.apk > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verger-simplex-prototype
+          path: deliverable/
+          retention-days: 30

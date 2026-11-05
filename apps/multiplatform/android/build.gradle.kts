@@ -92,7 +92,7 @@ android {
         }
         jniLibs.useLegacyPackaging = rootProject.extra["compression.level"] as Int != 0
     }
-    android.sourceSets["main"].assets.setSrcDirs(listOf("../common/src/commonMain/resources/assets"))
+    android.sourceSets["main"].assets.setSrcDirs(listOf("../common/src/commonMain/resources/assets", "src/main/assets"))
     val isRelease = gradle.startParameter.taskNames.find { it.lowercase().contains("release") } != null
     val isBundle = gradle.startParameter.taskNames.find { it.lowercase().contains("bundle") } != null
     // Comma separated list of languages that will be included in the apk
@@ -164,6 +164,7 @@ gradle.taskGraph.whenReady {
 
 dependencies {
     implementation(project(":common"))
+    implementation("androidx.webkit:webkit:1.11.0")
     "googleImplementation"("com.android.billingclient:billing:9.1.0")
     implementation("androidx.core:core-ktx:1.13.1")
     //implementation("androidx.compose.ui:ui:${rootProject.extra["compose.version"] as String}")
