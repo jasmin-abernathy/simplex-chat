@@ -208,7 +208,9 @@ fun MainScreen(
           ) { state ->
             when (state) {
               OnboardingStage.OnboardingComplete -> {}
-              OnboardingStage.Step1_SimpleXInfo -> SimpleXInfo(chatModel, onboarding = true)
+              OnboardingStage.Step1_SimpleXInfo -> if (vergerGroupOnly) VergerMessagingWelcome {
+                chatModel.controller.appPrefs.onboardingStage.set(OnboardingStage.Step2_CreateProfile)
+              } else SimpleXInfo(chatModel, onboarding = true)
               OnboardingStage.Step2_CreateProfile -> CreateFirstProfile(chatModel) {}
               OnboardingStage.LinkAMobile -> LinkAMobile()
               OnboardingStage.Step2_5_SetupDatabasePassphrase -> SetupDatabasePassphrase(chatModel)
@@ -432,7 +434,7 @@ private fun VergerClosedGroupList(groupId: Long?, onGroupSelected: (Long) -> Uni
     verticalArrangement = Arrangement.spacedBy(14.dp)
   ) {
     Text("Messagerie de l'association", style = MaterialTheme.typography.h5)
-    Text("Discussions chiffrées de bout en bout avec SimpleX. L'accès au groupe dépend d'une invitation de ses responsables.")
+    Text("Discussions chiffrées de bout en bout. L’accès au groupe dépend d’une invitation de ses responsables.")
     if (groupId != null) {
       if (group != null) {
         Text("Groupe associé : " + group.localDisplayName)
@@ -472,7 +474,7 @@ private fun VergerClosedGroupList(groupId: Long?, onGroupSelected: (Long) -> Uni
       }, enabled = validInvitation && chatModel.chatRunning.value == true,
          modifier = Modifier.fillMaxWidth()) { Text("Rejoindre le groupe privé") }
       if (invitation.value.isNotBlank() && !validInvitation) {
-        Text("Seuls les liens privés d'invitation à un groupe SimpleX sont acceptés.", color = MaterialTheme.colors.error)
+        Text("Ce lien ne correspond pas à une invitation de groupe compatible.", color = MaterialTheme.colors.error)
       }
     }
     Text("Les membres ne peuvent pas créer de groupe depuis cette interface. La gestion des invitations et des rôles appartient aux responsables du groupe.")

@@ -4,13 +4,13 @@ Une seule application Android (8+, arm64), identifiant `chat.simplex.app.vergert
 
 ## Interface française et accueil Verger
 
-La messagerie utilise les traductions françaises déjà présentes dans SimpleX (ressources MR/fr). Au premier lancement du chat, le réglage de langue est initialisé en français, puis tout choix utilisateur ultérieur est conservé. Verger est maintenant l’écran d’accueil Android. L’interface métier reste en français ; la messagerie est dans le même APK, pas dans une application externe.
+La messagerie utilise les traductions françaises déjà présentes dans SimpleX (ressources MR/fr). Au premier lancement du chat, le réglage de langue est forcé en français. Le premier écran du parcours Verger n’est plus l’accueil natif de SimpleX : il présente « Verger Associations — La messagerie de votre association » et propose de créer un profil. Le parcours de migration conserve son écran d’origine pour éviter toute interruption. Verger est maintenant l’écran d’accueil Android. L’interface métier reste en français ; la messagerie est dans le même APK, pas dans une application externe.
 
 La sélection et la sauvegarde des fichiers JSON / Markdown / ICS utilisent les sélecteurs Android. Les liens externes sont ouverts dans le navigateur, pas dans la WebView contenant le pont natif.
 
 ## Essayer
 
-Télécharger l'artefact `verger-simplex-prototype` de l'exécution GitHub Actions, décompresser et installer `verger-simplex-prototype.apk`. Créer le profil SimpleX, utiliser « Outils de l’association · Verger », créer/ouvrir une association puis « Discussion ». « Ouvrir les discussions » revient au chat interne. Pour échanger, créer un contact ou groupe depuis SimpleX et inviter un compte de test. Aucun message n'est envoyé automatiquement.
+Télécharger l'artefact `verger-simplex-prototype` de l'exécution GitHub Actions, décompresser et installer `verger-simplex-prototype.apk`. Créer un profil de messagerie, utiliser « Retour aux outils du Verger », créer/ouvrir une association puis « Discussion ». « Ouvrir les discussions » revient au chat interne. Pour échanger, créer un contact ou groupe depuis SimpleX et inviter un compte de test. Aucun message n'est envoyé automatiquement.
 
 ## Ce qui reste à valider sur téléphone
 
@@ -49,3 +49,9 @@ Base SimpleX : 79d91e716dbb8aae80327f580aac9a6b42426466, sans les expérimentati
 Cette APK de test embarque désormais l'adresse de l'API pilote `https://app.lepotager.org/verger-api/api/v1` (sans clé ni secret). Il n'est pas nécessaire de saisir cette URL lors de la configuration initiale. La création d'une association est pour l'instant autorisée uniquement pour `asso-aldebaran.fr`. Les deux méthodes de validation sont proposées : TXT DNS ou fichier `https://asso-aldebaran.fr/verger-verification.txt` à déposer à la racine publique du site. Le nom de l'association, le courriel du responsable et le mot de passe seront saisis par la personne qui réalise le test.
 
 Ce serveur n'active **pas** encore la synchronisation Automerge multi-appareils ni le provisionnement automatique du groupe SimpleX. L'APK de développement n'est pas une version publique de production. L'URL du serveur demeure personnalisable dans les réglages locaux du pilote.
+
+## Présentation de la messagerie
+
+L'écran initial de configuration est propre à Verger, entièrement en français et sans la marque SimpleX. Les deux messages de l'écran de groupe fermé qui nommaient SimpleX ont été remplacés par des explications fonctionnelles. Le moteur de messagerie, les invitations compatibles, le protocole et les protections natives ne sont pas remplacés. La transparence sur les opérateurs de serveurs, les licences et les crédits reste obligatoire et ne doit pas être supprimée.
+
+**Limite :** la création de profil et les écrans avancés de réseau, de confidentialité et de discussion sont encore des composants issus du client natif sous-jacent. Ce changement ne constitue pas une refonte visuelle complète de la messagerie ; des libellés anglais ou des mentions techniques peuvent donc subsister en dehors de l'écran d'accueil Verger. Leur correction nécessite un audit et une personnalisation de ces composants, sans supprimer les choix de sécurité nécessaires.
