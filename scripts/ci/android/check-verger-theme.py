@@ -48,3 +48,9 @@ if "SimpleXTheme(vergerTheme = vergerGroupOnly)" not in app:
 if "LocalVergerVisuals provides vergerTheme" not in code:
     raise AssertionError("Verger palette may be overridden by nested chat themes")
 print("Verger common restrained palettes: OK")
+
+bridge_file = root / "apps/multiplatform/android/src/main/java/chat/simplex/app/VergerActivity.kt"
+bridge_code = bridge_file.read_text(encoding="utf-8")
+if '"text/plain"' not in bridge_code or 'window.VergerNative' in bridge_code:
+    raise AssertionError("Missing secure Android text/plain export for verification proof")
+print("Verger domain verification text file can be saved by Android bridge: OK")

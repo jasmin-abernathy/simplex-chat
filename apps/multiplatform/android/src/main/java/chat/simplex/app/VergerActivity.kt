@@ -162,7 +162,7 @@ class VergerActivity : FragmentActivity() {
     @JavascriptInterface
     fun saveText(filename: String, mime: String, contents: String) = runOnUiThread {
       if (!VergerWebPolicy.isDocument(webView.url)) return@runOnUiThread
-      if (mime !in setOf("application/json", "text/markdown", "text/calendar")) return@runOnUiThread
+      if (mime !in setOf("application/json", "text/markdown", "text/calendar", "text/plain")) return@runOnUiThread
       val bytes = contents.toByteArray(Charsets.UTF_8)
       if (bytes.size > 12_000_000) {
         Toast.makeText(this@VergerActivity, "Export trop volumineux (limite 12 Mo)", Toast.LENGTH_LONG).show()

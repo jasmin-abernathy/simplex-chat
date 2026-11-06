@@ -59,3 +59,5 @@ L'écran initial de configuration est propre à Verger, entièrement en françai
 ## Palette commune et sobre
 
 La messagerie Verger utilise une palette identique pour toutes les associations : vert profond, gris doux, blanc cassé en clair ; vert sauge et gris anthracite en sombre. Les bulles envoyées et reçues restent distinctes. Le mode clair/sombre du téléphone est respecté, sans personnalisation selon l'association. La portée est limitée aux vues Verger, y compris les écrans de discussion et les variantes des couleurs de conversation. Les licences, crédits et informations sur les serveurs demeurent accessibles.
+
+Le sélecteur Android accepte désormais explicitement les exports `text/plain` nécessaires à la méthode de validation du domaine par fichier (`verger-verification.txt`), tout en conservant la liste fermée des autres formats exportables.
