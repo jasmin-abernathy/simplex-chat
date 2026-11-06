@@ -59,13 +59,15 @@ jobs:
         working-directory: apps/multiplatform
         run: |
           printf 'application_id.suffix=.vergertest\napp.name=Verger SimpleX Prototype\n' > local.properties
-          ./gradlew --no-daemon --max-workers=1 -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" -Pkotlin.compiler.execution.strategy=in-process -Pandroid.injected.build.abi=arm64-v8a :common:desktopTest :android:testFossDebugUnitTest :android:assembleFossDebug
+          ./gradlew --no-daemon --max-workers=1 -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" -Pkotlin.compiler.execution.strategy=in-process -Pandroid.injected.build.abi=arm64-v8a -Pandroid.injected.testOnly=false :common:desktopTest :android:testFossDebugUnitTest :android:assembleFossDebug
       - name: Verify package, assets, native libraries and signature
         run: |
           mkdir -p deliverable
           cp apps/multiplatform/android/build/intermediates/apk/foss/debug/android-foss-arm64-v8a-debug.apk deliverable/verger-simplex-prototype.apk
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging deliverable/verger-simplex-prototype.apk | head -1 | grep "chat.simplex.app.vergertest"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify deliverable/verger-simplex-prototype.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump xmltree deliverable/verger-simplex-prototype.apk AndroidManifest.xml > "$RUNNER_TEMP/apk-manifest"
+          python3 scripts/ci/android/check-installable-manifest.py "$RUNNER_TEMP/apk-manifest"
           unzip -l deliverable/verger-simplex-prototype.apk > "$RUNNER_TEMP/apk-files"
           for entry in assets/verger/index.html lib/arm64-v8a/libapp-lib.so lib/arm64-v8a/libsimplex.so lib/arm64-v8a/libsupport.so; do grep -F "$entry" "$RUNNER_TEMP/apk-files"; done
           printf 'SimpleX source: %s\nVerger source: ed99ffc51dadbd3af9a193c5dc71d180bf658bc1\n' "$GITHUB_SHA" > deliverable/SOURCES.txt
