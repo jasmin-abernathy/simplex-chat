@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Color
+import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Bundle
 import android.webkit.JavascriptInterface
@@ -57,7 +58,7 @@ class VergerActivity : FragmentActivity() {
     super.onCreate(savedInstanceState)
     val layout = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
-      setBackgroundColor(Color.WHITE)
+      setBackgroundColor(Color.rgb(247, 248, 246))
     }
     ViewCompat.setOnApplyWindowInsetsListener(layout) { view, insets ->
       val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
@@ -66,6 +67,9 @@ class VergerActivity : FragmentActivity() {
     }
     val chatButton = Button(this).apply {
       text = "Messagerie de l’association"
+      isAllCaps = false
+      setTextColor(Color.WHITE)
+      backgroundTintList = ColorStateList.valueOf(Color.rgb(49, 92, 73))
       minHeight = (48 * resources.displayMetrics.density).toInt()
       setOnClickListener { openChat() }
     }

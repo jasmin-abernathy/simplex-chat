@@ -51,7 +51,7 @@ fun AppScreen(
   onVergerGroupSelected: (Long) -> Unit = {},
 ) {
   AppBarHandler.appBarMaxHeightPx = with(LocalDensity.current) { AppBarHeight.roundToPx() }
-  SimpleXTheme {
+  SimpleXTheme(vergerTheme = vergerGroupOnly) {
     Surface(color = MaterialTheme.colors.background, contentColor = LocalContentColor.current) {
       // This padding applies to landscape view only taking care of navigation bar and holes in screen in status bar area
       // (because nav bar and holes located on vertical sides of screen in landscape view)

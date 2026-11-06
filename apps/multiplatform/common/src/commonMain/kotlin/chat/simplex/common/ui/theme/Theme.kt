@@ -750,6 +750,35 @@ val BlackColorPaletteApp = AppColors(
   receivedQuote = Color(0xff29292b),
 )
 
+
+/** Sobriety and readability for every Verger association, regardless of its logo. */
+val VergerLightColorPalette = lightColors(
+  primary = Color(0xFF315C49), primaryVariant = Color(0xFF254A3A),
+  secondary = Color(0xFF586860), secondaryVariant = Color(0xFFE8ECE9),
+  background = Color(0xFFF7F8F6), surface = Color.White,
+  error = Color(0xFFA93034), onPrimary = Color.White,
+  onSecondary = Color(0xFF1B2520), onBackground = Color(0xFF1F2924),
+  onSurface = Color(0xFF1F2924),
+)
+val VergerLightAppColors = AppColors(
+  title = Color(0xFF315C49), primaryVariant2 = Color(0xFFE1EBE5),
+  sentMessage = Color(0xFFE1EBE5), sentQuote = Color(0xFFCFDFD5),
+  receivedMessage = Color(0xFFF0F2F1), receivedQuote = Color(0xFFE3E8E5),
+)
+val VergerDarkColorPalette = darkColors(
+  primary = Color(0xFFA8C6AF), primaryVariant = Color(0xFF8EB29A),
+  secondary = Color(0xFFB5C3B9), secondaryVariant = Color(0xFF304039),
+  background = Color(0xFF151C19), surface = Color(0xFF202923),
+  error = Color(0xFFFFB4AB), onPrimary = Color(0xFF142019),
+  onSecondary = Color(0xFF142019), onBackground = Color(0xFFEEF2EF),
+  onSurface = Color(0xFFEEF2EF),
+)
+val VergerDarkAppColors = AppColors(
+  title = Color(0xFFA8C6AF), primaryVariant2 = Color(0xFF2C4638),
+  sentMessage = Color(0xFF2C4638), sentQuote = Color(0xFF395544),
+  receivedMessage = Color(0xFF28322D), receivedQuote = Color(0xFF37443B),
+)
+
 var systemInDarkThemeCurrently: Boolean = isInNightMode()
 
 // Spec: spec/services/theme.md#CurrentColors
@@ -761,6 +790,7 @@ fun isInDarkTheme(): Boolean = !CurrentColors.collectAsState().value.colors.isLi
 @Composable
 expect fun isSystemInDarkTheme(): Boolean
 
+internal val LocalVergerVisuals = staticCompositionLocalOf { false }
 internal val LocalAppColors = staticCompositionLocalOf { LightColorPaletteApp }
 internal val LocalAppWallpaper = staticCompositionLocalOf { AppWallpaper() }
 
@@ -799,7 +829,7 @@ fun reactOnDarkThemeChanges(isDark: Boolean) {
 
 // Spec: spec/services/theme.md#SimpleXTheme
 @Composable
-fun SimpleXTheme(darkTheme: Boolean? = null, content: @Composable () -> Unit) {
+fun SimpleXTheme(darkTheme: Boolean? = null, vergerTheme: Boolean = false, content: @Composable () -> Unit) {
 // TODO: Fix preview working with dark/light theme
 
 //  LaunchedEffect(darkTheme) {
@@ -823,8 +853,15 @@ fun SimpleXTheme(darkTheme: Boolean? = null, content: @Composable () -> Unit) {
         ThemeManager.applyTheme(appPrefs.currentTheme.get()!!)
       }
   }
+  val activeColors = if (vergerTheme) {
+    if (theme.colors.isLight) VergerLightColorPalette else VergerDarkColorPalette
+  } else theme.colors
+  val activeAppColors = if (vergerTheme) {
+    if (theme.colors.isLight) VergerLightAppColors else VergerDarkAppColors
+  } else theme.appColors
+  val activeWallpaper = if (vergerTheme) AppWallpaper() else theme.wallpaper
   MaterialTheme(
-    colors = theme.colors,
+    colors = activeColors,
     typography = Typography,
     shapes = Shapes,
     content = {
@@ -832,14 +869,15 @@ fun SimpleXTheme(darkTheme: Boolean? = null, content: @Composable () -> Unit) {
       val rememberedAppColors = remember {
         // Explicitly creating a new object here so we don't mutate the initial [appColors]
         // provided, and overwrite the values set in it.
-        theme.appColors.copy()
-      }.apply { updateColorsFrom(theme.appColors) }
+        activeAppColors.copy()
+      }.apply { updateColorsFrom(activeAppColors) }
       val rememberedWallpaper = remember {
         // Explicitly creating a new object here so we don't mutate the initial [wallpaper]
         // provided, and overwrite the values set in it.
-        theme.wallpaper.copy()
-      }.apply { updateWallpaperFrom(theme.wallpaper) }
+        activeWallpaper.copy()
+      }.apply { updateWallpaperFrom(activeWallpaper) }
       CompositionLocalProvider(
+        LocalVergerVisuals provides vergerTheme,
         LocalContentColor provides MaterialTheme.colors.onBackground,
         LocalAppColors provides rememberedAppColors,
         LocalAppWallpaper provides rememberedWallpaper,
@@ -852,21 +890,29 @@ fun SimpleXTheme(darkTheme: Boolean? = null, content: @Composable () -> Unit) {
 
 @Composable
 fun SimpleXThemeOverride(theme: ThemeManager.ActiveTheme, content: @Composable () -> Unit) {
+  val vergerTheme = LocalVergerVisuals.current
+  val activeColors = if (vergerTheme) {
+    if (theme.colors.isLight) VergerLightColorPalette else VergerDarkColorPalette
+  } else theme.colors
+  val activeAppColors = if (vergerTheme) {
+    if (theme.colors.isLight) VergerLightAppColors else VergerDarkAppColors
+  } else theme.appColors
+  val activeWallpaper = if (vergerTheme) AppWallpaper() else theme.wallpaper
   MaterialTheme(
-    colors = theme.colors,
+    colors = activeColors,
     typography = Typography,
     shapes = Shapes,
     content = {
       val rememberedAppColors = remember {
         // Explicitly creating a new object here so we don't mutate the initial [appColors]
         // provided, and overwrite the values set in it.
-        theme.appColors.copy()
-      }.apply { updateColorsFrom(theme.appColors) }
+        activeAppColors.copy()
+      }.apply { updateColorsFrom(activeAppColors) }
       val rememberedWallpaper = remember {
         // Explicitly creating a new object here so we don't mutate the initial [wallpaper]
         // provided, and overwrite the values set in it.
-        theme.wallpaper.copy()
-      }.apply { updateWallpaperFrom(theme.wallpaper) }
+        activeWallpaper.copy()
+      }.apply { updateWallpaperFrom(activeWallpaper) }
       CompositionLocalProvider(
         LocalContentColor provides MaterialTheme.colors.onBackground,
         LocalAppColors provides rememberedAppColors,
