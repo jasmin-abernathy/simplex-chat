@@ -757,7 +757,7 @@ val VergerLightColorPalette = lightColors(
   secondary = Color(0xFF586860), secondaryVariant = Color(0xFFE8ECE9),
   background = Color(0xFFF7F8F6), surface = Color.White,
   error = Color(0xFFA93034), onPrimary = Color.White,
-  onSecondary = Color(0xFF1B2520), onBackground = Color(0xFF1F2924),
+  onSecondary = Color.White, onBackground = Color(0xFF1F2924),
   onSurface = Color(0xFF1F2924),
 )
 val VergerLightAppColors = AppColors(

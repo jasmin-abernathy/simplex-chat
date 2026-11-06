@@ -30,6 +30,8 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
+      - name: Check Verger messaging palette and contrast
+        run: python3 scripts/ci/android/check-verger-theme.py
       - name: Test and bundle Verger
         working-directory: verger-source/apps/verger-pwa
         env:
