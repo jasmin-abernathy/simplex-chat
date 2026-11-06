@@ -11,7 +11,13 @@ object VergerGroupPolicy {
     else {
       val uri = URI(raw)
       val validScheme = when (uri.scheme?.lowercase()) {
-        "https" -> uri.host?.lowercase() == "simplex.chat" && uri.port == -1 && uri.userInfo == null
+        "https" -> {
+          val host = uri.host?.lowercase() ?: ""
+          val trusted = host == "simplex.chat" ||
+            Regex("smp[0-9]+\\.simplex\\.im").matches(host) ||
+            Regex("smp[0-9]+\\.simplexonflux\\.com").matches(host)
+          trusted && uri.port == -1 && uri.userInfo == null
+        }
         "simplex" -> uri.host.isNullOrEmpty() && uri.userInfo == null
         else -> false
       }

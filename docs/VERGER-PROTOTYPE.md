@@ -26,6 +26,8 @@ Le chiffrement de bout en bout des messages reste celui de SimpleX ; les donnée
 Le contrôle de qui peut inviter et révoquer repose **toujours sur les rôles et les réglages du groupe SimpleX**, pas sur la simple disparition des boutons.
 Le lien entre groupe et association est un paramètre local sur cet appareil ; la révocation Verger/Automerge reste un chantier séparé.
 Le groupe se prépare au préalable côté responsables, via un client SimpleX standard : aucune création de groupe n'est proposée dans l'APK Verger.
+Les liens d'invitation de groupe sur `simplex.chat`, `smpN.simplex.im` et `smpN.simplexonflux.com` sont reconnus ; les liens de contact individuel sont refusés.
+Un lien de groupe permanent partagé publiquement ne suffit **pas** à garantir un groupe fermé : les responsables doivent préférer les invitations individuelles, limiter les droits d'invitation aux administrateurs et retirer/régénérer les liens de groupe en cas de diffusion. Le pilote ne vérifie pas automatiquement ces réglages ni l'identité des membres.
 Cette interface ne constitue pas une interdiction protocolaire de créer des groupes avec un autre client SimpleX.
 
 ## Limites explicites
