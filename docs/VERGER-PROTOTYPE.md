@@ -2,6 +2,12 @@
 
 Une seule application Android (8+, arm64), identifiant `chat.simplex.app.vergertest`. Les outils Verger sont embarqués hors ligne dans une WebView locale ; les discussions utilisent les écrans et le moteur natifs SimpleX du même APK. Aucun lancement d'une autre application pour accéder au chat.
 
+## Interface française et accueil Verger
+
+La messagerie utilise les traductions françaises déjà présentes dans SimpleX (ressources MR/fr). Au premier lancement du chat, le réglage de langue est initialisé en français, puis tout choix utilisateur ultérieur est conservé. Verger est maintenant l’écran d’accueil Android. L’interface métier reste en français ; la messagerie est dans le même APK, pas dans une application externe.
+
+La sélection et la sauvegarde des fichiers JSON / Markdown / ICS utilisent les sélecteurs Android. Les liens externes sont ouverts dans le navigateur, pas dans la WebView contenant le pont natif.
+
 ## Essayer
 
 Télécharger l'artefact `verger-simplex-prototype` de l'exécution GitHub Actions, décompresser et installer `verger-simplex-prototype.apk`. Créer le profil SimpleX, utiliser « Outils de l’association · Verger », créer/ouvrir une association puis « Discussion ». « Ouvrir les discussions » revient au chat interne. Pour échanger, créer un contact ou groupe depuis SimpleX et inviter un compte de test. Aucun message n'est envoyé automatiquement.

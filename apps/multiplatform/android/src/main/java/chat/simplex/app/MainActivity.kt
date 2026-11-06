@@ -35,6 +35,13 @@ class MainActivity: FragmentActivity() {
     platform.androidSetNightModeIfSupported()
     val c = CurrentColors.value.colors
     platform.androidSetStatusAndNavigationBarAppearance(c.isLight, c.isLight)
+    // Français au premier démarrage du prototype ; conserver ensuite le choix utilisateur.
+    val languagePrefs = getSharedPreferences("verger-language", MODE_PRIVATE)
+    if (!languagePrefs.getBoolean("initialized", false)) {
+      val language = ChatModel.controller.appPrefs.appLanguage
+      language.set("fr")
+      languagePrefs.edit().putBoolean("initialized", true).apply()
+    }
     applyAppLocale(ChatModel.controller.appPrefs.appLanguage)
     // This flag makes status bar and navigation bar fully transparent. But on API level < 30 it breaks insets entirely
     // https://issuetracker.google.com/issues/236862874
@@ -63,7 +70,7 @@ class MainActivity: FragmentActivity() {
         TextButton(
           onClick = { startActivity(Intent(this@MainActivity, VergerActivity::class.java)) },
           modifier = Modifier.fillMaxWidth().statusBarsPadding()
-        ) { Text("Outils de l’association · Verger") }
+        ) { Text("Retour aux outils du Verger") }
         Box(Modifier.weight(1f)) { AppScreen() }
       }
     }

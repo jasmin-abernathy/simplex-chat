@@ -39,7 +39,7 @@
       android:name="SimplexApp"
       android:allowBackup="false"
       android:fullBackupOnly="false"
-      android:icon="@mipmap/icon"
+      android:icon="@drawable/ic_verger_launcher"
       android:label="${app_name}"
       android:largeHeap="true"
       android:extractNativeLibs="${extract_native_libs}"
@@ -47,10 +47,16 @@
       android:theme="@style/Theme.SimpleX">
     <!--      android:localeConfig="@xml/locales_config"-->
 
+    <!-- Verger, et non le carnet de discussions SimpleX, est l’écran de lancement. -->
     <activity android:name=".VergerActivity"
-        android:exported="false"
+        android:exported="true"
         android:windowSoftInputMode="adjustResize"
-        android:theme="@style/Theme.SimpleX" />
+        android:theme="@style/Theme.SimpleX">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
 
     <!-- Main activity -->
     <activity
@@ -62,10 +68,6 @@
         android:windowSoftInputMode="adjustResize"
         android:configChanges="uiMode"
         android:theme="@style/Theme.SimpleX">
-      <intent-filter>
-        <category android:name="android.intent.category.LAUNCHER" />
-      </intent-filter>
-
       <!-- open simplex:/ connection URI -->
       <intent-filter>
         <action android:name="android.intent.action.VIEW" />
@@ -133,27 +135,17 @@
 
     <activity-alias
         android:name=".MainActivity_default"
-        android:exported="true"
+        android:exported="false"
         android:icon="@mipmap/icon"
-        android:enabled="true"
-        android:targetActivity=".MainActivity">
-      <intent-filter>
-        <action android:name="android.intent.action.MAIN" />
-        <category android:name="android.intent.category.LAUNCHER" />
-      </intent-filter>
-    </activity-alias>
+        android:enabled="false"
+        android:targetActivity=".MainActivity" />
 
     <activity-alias
         android:name=".MainActivity_dark_blue"
-        android:exported="true"
+        android:exported="false"
         android:icon="@mipmap/icon_dark_blue"
         android:enabled="false"
-        android:targetActivity=".MainActivity">
-      <intent-filter>
-        <action android:name="android.intent.action.MAIN" />
-        <category android:name="android.intent.category.LAUNCHER" />
-      </intent-filter>
-    </activity-alias>
+        android:targetActivity=".MainActivity" />
 
     <activity android:name=".views.call.CallActivity"
         android:showOnLockScreen="true"
