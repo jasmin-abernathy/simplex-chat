@@ -43,3 +43,9 @@ Cette interface ne constitue pas une interdiction protocolaire de créer des gro
 Workflow `.github/workflows/verger-prototype-apk.yml`, volontairement limité à la branche prototype et au déclenchement manuel. Source Verger épinglée. Le noyau natif provient du build réussi 40937013106 du même fork ; le workflow vérifie que ses sources natives sont identiques. Cet artefact expire le 12 novembre 2026 : ensuite reconstruire avec `bash scripts/ci/android/build-core.sh /tmp/android-core.tar.gz` puis mettre à jour la référence d'artefact.
 
 Base SimpleX : 79d91e716dbb8aae80327f580aac9a6b42426466, sans les expérimentations Vault/appels de groupe. Licences amont conservées. La passerelle JavaScript expose uniquement la navigation interne, pas les messages ni les clés. Seul le document local embarqué peut naviguer dans cette WebView.
+
+## Serveur de vérification pour le test ALDEBARAN
+
+Cette APK de test embarque désormais l'adresse de l'API pilote `https://app.lepotager.org/verger-api/api/v1` (sans clé ni secret). Il n'est pas nécessaire de saisir cette URL lors de la configuration initiale. La création d'une association est pour l'instant autorisée uniquement pour `asso-aldebaran.fr`. Les deux méthodes de validation sont proposées : TXT DNS ou fichier `https://asso-aldebaran.fr/verger-verification.txt` à déposer à la racine publique du site. Le nom de l'association, le courriel du responsable et le mot de passe seront saisis par la personne qui réalise le test.
+
+Ce serveur n'active **pas** encore la synchronisation Automerge multi-appareils ni le provisionnement automatique du groupe SimpleX. L'APK de développement n'est pas une version publique de production. L'URL du serveur demeure personnalisable dans les réglages locaux du pilote.
