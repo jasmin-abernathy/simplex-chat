@@ -45,7 +45,11 @@ import kotlinx.coroutines.flow.*
 
 // Spec: spec/client/navigation.md#AppScreen
 @Composable
-fun AppScreen() {
+fun AppScreen(
+  vergerGroupOnly: Boolean = false,
+  vergerGroupId: Long? = null,
+  onVergerGroupSelected: (Long) -> Unit = {},
+) {
   AppBarHandler.appBarMaxHeightPx = with(LocalDensity.current) { AppBarHeight.roundToPx() }
   SimpleXTheme {
     Surface(color = MaterialTheme.colors.background, contentColor = LocalContentColor.current) {
@@ -72,7 +76,7 @@ fun AppScreen() {
               drawRect(Color.Black,  topLeft = Offset(-(paddingStart + cutoutMax).toPx(), 0f), Size(size.width + (paddingStart + cutoutMax).toPx() + (paddingEnd + cutoutMax).toPx(), size.height))
             }
           }) {
-            MainScreen()
+            MainScreen(vergerGroupOnly, vergerGroupId, onVergerGroupSelected)
           }
         }
       }
@@ -82,7 +86,24 @@ fun AppScreen() {
 
 // Spec: spec/client/navigation.md#MainScreen
 @Composable
-fun MainScreen() {
+fun MainScreen(
+  vergerGroupOnly: Boolean = false,
+  vergerGroupId: Long? = null,
+  onVergerGroupSelected: (Long) -> Unit = {},
+) {
+  // Même si un menu SimpleX essaie d'ouvrir un autre fil, le Verger n'affiche
+  // que le groupe explicitement associé sur cet appareil.
+  LaunchedEffect(vergerGroupOnly, chatModel.sharedContent.value) {
+    if (vergerGroupOnly && chatModel.sharedContent.value != null) chatModel.sharedContent.value = null
+  }
+  LaunchedEffect(vergerGroupOnly, vergerGroupId, chatModel.chatId.value, chatModel.chats.value) {
+    if (vergerGroupOnly && chatModel.chatId.value != null) {
+      val selectedChat = chatModel.chats.value.firstOrNull { it.chatInfo.id == chatModel.chatId.value }?.chatInfo as? ChatInfo.Group
+      if (vergerGroupId == null || selectedChat?.groupInfo?.groupId != vergerGroupId) {
+        chatModel.chatId.value = null
+      }
+    }
+  }
   val chatModel = ChatModel
   var showChatDatabaseError by rememberSaveable {
     mutableStateOf(chatModel.chatDbStatus.value != DBMigrationResult.OK && chatModel.chatDbStatus.value != null)
@@ -165,7 +186,7 @@ fun MainScreen() {
           }
           if (appPlatform.isAndroid) {
             AndroidWrapInCallLayout {
-              AndroidScreen(userPickerState)
+              AndroidScreen(userPickerState, vergerGroupOnly, vergerGroupId, onVergerGroupSelected)
             }
           } else {
             DesktopScreen(userPickerState)
@@ -307,7 +328,12 @@ fun AndroidWrapInCallLayout(content: @Composable () -> Unit) {
 
 // Spec: spec/client/navigation.md#AndroidScreen
 @Composable
-fun AndroidScreen(userPickerState: MutableStateFlow<AnimatedViewState>) {
+fun AndroidScreen(
+  userPickerState: MutableStateFlow<AnimatedViewState>,
+  vergerGroupOnly: Boolean = false,
+  vergerGroupId: Long? = null,
+  onVergerGroupSelected: (Long) -> Unit = {},
+) {
   BoxWithConstraints {
     val currentChatId = remember { mutableStateOf(chatModel.chatId.value) }
     val offset = remember { Animatable(if (chatModel.chatId.value == null) 0f else maxWidth.value) }
@@ -326,7 +352,7 @@ fun AndroidScreen(userPickerState: MutableStateFlow<AnimatedViewState>) {
           translationX = -minOf(offset.value.dp, maxWidth).toPx()
         }
     ) {
-      StartPartOfScreen(userPickerState)
+      StartPartOfScreen(userPickerState, vergerGroupOnly, vergerGroupId, onVergerGroupSelected)
     }
     val scope = rememberCoroutineScope()
     val onComposed: suspend (chatId: String?) -> Unit = { chatId ->
@@ -363,16 +389,25 @@ fun AndroidScreen(userPickerState: MutableStateFlow<AnimatedViewState>) {
 }
 
 @Composable
-fun StartPartOfScreen(userPickerState: MutableStateFlow<AnimatedViewState>) {
+fun StartPartOfScreen(
+  userPickerState: MutableStateFlow<AnimatedViewState>,
+  vergerGroupOnly: Boolean = false,
+  vergerGroupId: Long? = null,
+  onVergerGroupSelected: (Long) -> Unit = {},
+) {
   if (chatModel.setDeliveryReceipts.value) {
     CompositionLocalProvider(LocalAppBarHandler provides rememberAppBarHandler()) {
       SetDeliveryReceiptsView(chatModel)
     }
   } else {
     val stopped = chatModel.chatRunning.value == false
-    if (chatModel.sharedContent.value == null) {
+    if (vergerGroupOnly || chatModel.sharedContent.value == null) {
       CompositionLocalProvider(LocalAppBarHandler provides rememberAppBarHandler()) {
-        ChatListView(chatModel, userPickerState, AppLock::setPerformLA, stopped)
+        if (vergerGroupOnly) {
+          VergerClosedGroupList(vergerGroupId, onVergerGroupSelected)
+        } else {
+          ChatListView(chatModel, userPickerState, AppLock::setPerformLA, stopped)
+        }
       }
     } else {
       // LALAL initial load of view doesn't show blur. Focusing text field shows it
@@ -383,6 +418,66 @@ fun StartPartOfScreen(userPickerState: MutableStateFlow<AnimatedViewState>) {
   }
 }
 
+
+/** Application du groupe privé de l'association : ni recherche de contacts,
+ * ni annuaire, ni création libre de nouvelles conversations ou groupes. */
+@Composable
+private fun VergerClosedGroupList(groupId: Long?, onGroupSelected: (Long) -> Unit) {
+  val groups = chatModel.chats.value.mapNotNull { it.chatInfo as? ChatInfo.Group }
+    .filter { it.groupInfo.membership.memberActive }
+  val group = groups.firstOrNull { it.groupInfo.groupId == groupId }
+  val invitation = rememberSaveable { mutableStateOf("") }
+  Column(
+    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+    verticalArrangement = Arrangement.spacedBy(14.dp)
+  ) {
+    Text("Messagerie de l'association", style = MaterialTheme.typography.h5)
+    Text("Discussions chiffrées de bout en bout avec SimpleX. L'accès au groupe dépend d'une invitation de ses responsables.")
+    if (groupId != null) {
+      if (group != null) {
+        Text("Groupe associé : " + group.localDisplayName)
+        Button(
+          onClick = { chatModel.chatId.value = group.id },
+          modifier = Modifier.fillMaxWidth()
+        ) { Text("Ouvrir la discussion") }
+      } else {
+        Text("Le groupe associé n'est plus disponible sur cet appareil. Vérifiez votre profil et votre accès avec un responsable.")
+      }
+    } else {
+      if (groups.isNotEmpty()) {
+        Text("Choisissez le groupe privé de votre association parmi ceux que vous avez déjà rejoints :")
+        groups.forEach { candidate ->
+          Button(onClick = {
+            onGroupSelected(candidate.groupInfo.groupId)
+            chatModel.chatId.value = candidate.id
+          }, modifier = Modifier.fillMaxWidth()) {
+            Text("Associer : " + candidate.localDisplayName)
+          }
+        }
+      }
+      Text("Vous n'avez pas encore rejoint votre groupe ? Demandez un lien privé aux responsables, puis collez-le ci-dessous.")
+      OutlinedTextField(
+        value = invitation.value,
+        onValueChange = { invitation.value = it.take(16384) },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text("Lien d'invitation au groupe") },
+        singleLine = true
+      )
+      val validInvitation = VergerGroupPolicy.isGroupInvitation(invitation.value)
+      Button(onClick = {
+        if (validInvitation) {
+          chatModel.appOpenUrl.value = null to invitation.value.trim()
+          invitation.value = ""
+        }
+      }, enabled = validInvitation && chatModel.chatRunning.value == true,
+         modifier = Modifier.fillMaxWidth()) { Text("Rejoindre le groupe privé") }
+      if (invitation.value.isNotBlank() && !validInvitation) {
+        Text("Seuls les liens privés d'invitation à un groupe SimpleX sont acceptés.", color = MaterialTheme.colors.error)
+      }
+    }
+    Text("Les membres ne peuvent pas créer de groupe depuis cette interface. La gestion des invitations et des rôles appartient aux responsables du groupe.")
+  }
+}
 @Composable
 fun CenterPartOfScreen() {
   val currentChatId = remember { ChatModel.chatId }

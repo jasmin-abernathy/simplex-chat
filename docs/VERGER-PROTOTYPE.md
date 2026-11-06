@@ -16,6 +16,18 @@ Télécharger l'artefact `verger-simplex-prototype` de l'exécution GitHub Actio
 
 Installation, premier démarrage, aller-retour Verger/chat, conservation des données après fermeture, échange aller-retour entre deux comptes, réception en arrière-plan et clavier. La compilation et les tests automatiques ne valident pas ces parcours matériels.
 
+## Discussion en groupe fermé (interface dédiée)
+
+Le Verger n'expose plus la liste classique SimpleX avec les boutons « nouveau contact », « nouveau groupe » ou annuaire.
+Les membres rejoignent un groupe privé sur invitation et l'associent explicitement à ce Verger sur leur appareil.
+Après association, le sélecteur de groupe et le champ de nouveaux liens disparaissent ; seule la discussion associée est affichée.
+Les liens externes qui ne désignent pas une invitation à un groupe SimpleX sont refusés par l'activité Android.
+Le chiffrement de bout en bout des messages reste celui de SimpleX ; les données métier Automerge ne deviennent pas chiffrées par ce changement.
+Le contrôle de qui peut inviter et révoquer repose **toujours sur les rôles et les réglages du groupe SimpleX**, pas sur la simple disparition des boutons.
+Le lien entre groupe et association est un paramètre local sur cet appareil ; la révocation Verger/Automerge reste un chantier séparé.
+Le groupe se prépare au préalable côté responsables, via un client SimpleX standard : aucune création de groupe n'est proposée dans l'APK Verger.
+Cette interface ne constitue pas une interdiction protocolaire de créer des groupes avec un autre client SimpleX.
+
 ## Limites explicites
 
 - Les profils/groupes SimpleX ne sont pas encore associés automatiquement aux adhérents/associations.

@@ -6,6 +6,8 @@ import android.os.*
 import android.view.View
 import android.view.WindowManager
 import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.*
+import android.widget.Toast
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.ui.Modifier
@@ -54,8 +56,8 @@ class MainActivity: FragmentActivity() {
     // Only needed to be processed on first creation of activity
     if (savedInstanceState == null) {
       processNotificationIntent(intent)
-      processIntent(intent)
-      processExternalIntent(intent)
+      processVergerIntent(intent)
+      // Verger ne propose pas le partage externe vers des chats privés arbitraires.
     }
     if (ChatController.appPrefs.privacyProtectScreen.get()) {
       Log.d(TAG, "onCreate: set FLAG_SECURE")
@@ -71,17 +73,42 @@ class MainActivity: FragmentActivity() {
           onClick = { startActivity(Intent(this@MainActivity, VergerActivity::class.java)) },
           modifier = Modifier.fillMaxWidth().statusBarsPadding()
         ) { Text("Retour aux outils du Verger") }
-        Box(Modifier.weight(1f)) { AppScreen() }
+        val groupPrefs = remember { getSharedPreferences("verger-group", MODE_PRIVATE) }
+        val boundGroup = remember { mutableStateOf(groupPrefs.getLong("groupId", -1).takeIf { it > 0 }) }
+        Box(Modifier.weight(1f)) {
+          AppScreen(
+            vergerGroupOnly = true,
+            vergerGroupId = boundGroup.value,
+            onVergerGroupSelected = { selected ->
+              if (boundGroup.value == null && selected > 0) {
+                groupPrefs.edit().putLong("groupId", selected).apply()
+                boundGroup.value = selected
+              }
+            }
+          )
+        }
       }
     }
     SimplexApp.context.schedulePeriodicServiceRestartWorker()
     SimplexApp.context.schedulePeriodicWakeUp()
   }
 
+  /** Les liens vers des contacts ou d'autres groupes ne doivent pas ouvrir
+   * un second espace de messagerie dans le Verger. */
+  private fun processVergerIntent(intent: Intent?) {
+    if (intent?.action == Intent.ACTION_VIEW) {
+      val bound = getSharedPreferences("verger-group", MODE_PRIVATE).getLong("groupId", -1) > 0
+      if (bound || !VergerGroupPolicy.isGroupInvitation(intent.data?.toString())) {
+        Toast.makeText(this, "Lien refusé : seul le groupe privé de l'association est accessible", Toast.LENGTH_LONG).show()
+        return
+      }
+    }
+    processIntent(intent)
+  }
+
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
-    processIntent(intent)
-    processExternalIntent(intent)
+    processVergerIntent(intent)
   }
 
   override fun onResume() {
