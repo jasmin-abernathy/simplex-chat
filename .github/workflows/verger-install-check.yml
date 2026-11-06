@@ -1,0 +1,58 @@
+name: Verify Verger APK installation
+on:
+  push:
+    branches: [prototype/verger-install-check-20261106]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  installation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Wait for corrected APK build
+        uses: actions/github-script@v7
+        with:
+          script: |
+            for (let attempt = 0; attempt < 60; attempt++) {
+              const {data: run} = await github.rest.actions.getWorkflowRun({...context.repo, run_id: 42195669279});
+              if (run.status === 'completed') {
+                if (run.conclusion !== 'success') throw new Error('Corrected APK build failed: ' + run.conclusion);
+                return;
+              }
+              await new Promise(resolve => setTimeout(resolve, 20000));
+            }
+            throw new Error('Timed out waiting for corrected APK');
+      - uses: actions/download-artifact@v4
+        with:
+          name: verger-simplex-prototype
+          run-id: 42195669279
+          github-token: ${{ github.token }}
+          path: corrected
+      - uses: actions/download-artifact@v4
+        with:
+          name: verger-simplex-prototype
+          run-id: 42099912557
+          github-token: ${{ github.token }}
+          path: rejected
+      - name: Enable KVM for isolated test device
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Reproduce old refusal and install corrected APK without test override
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          script: bash scripts/ci/android/test-normal-install.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verger-installation-proof
+          path: installation-proof/
