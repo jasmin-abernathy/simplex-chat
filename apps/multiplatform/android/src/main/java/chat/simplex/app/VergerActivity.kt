@@ -65,7 +65,7 @@ class VergerActivity : FragmentActivity() {
       insets
     }
     val chatButton = Button(this).apply {
-      text = "Discussions · SimpleX"
+      text = "Messagerie de l’association"
       minHeight = (48 * resources.displayMetrics.density).toInt()
       setOnClickListener { openChat() }
     }
