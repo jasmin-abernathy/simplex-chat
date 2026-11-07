@@ -61,3 +61,7 @@ L'écran initial de configuration est propre à Verger, entièrement en françai
 La messagerie Verger utilise une palette identique pour toutes les associations : vert profond, gris doux, blanc cassé en clair ; vert sauge et gris anthracite en sombre. Les bulles envoyées et reçues restent distinctes. Le mode clair/sombre du téléphone est respecté, sans personnalisation selon l'association. La portée est limitée aux vues Verger, y compris les écrans de discussion et les variantes des couleurs de conversation. Les licences, crédits et informations sur les serveurs demeurent accessibles.
 
 Le sélecteur Android accepte désormais explicitement les exports `text/plain` nécessaires à la méthode de validation du domaine par fichier (`verger-verification.txt`), tout en conservant la liste fermée des autres formats exportables.
+
+## Fichier de vérification : destination Android
+
+Sur Android 10 et versions supérieures, le bouton « Télécharger verger-verification.txt » utilise MediaStore et dépose le fichier directement dans **Téléchargements**, sans demander de choisir un dossier. Un message confirme l’écriture réussie. Le contenu est vérifié et doit correspondre à un code de vérification temporaire. Sur Android 8 et 9, le sélecteur « Enregistrer sous » est conservé en repli. Les autres exports de l'application continuent à utiliser le sélecteur Android. Si un fichier du même nom existe déjà, vérifier le nom effectivement attribué par Android avant de le copier sur l’hébergement.

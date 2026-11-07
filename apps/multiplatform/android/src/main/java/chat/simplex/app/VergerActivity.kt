@@ -2,6 +2,10 @@ package chat.simplex.app
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.ContentValues
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.graphics.Color
@@ -153,6 +157,36 @@ class VergerActivity : FragmentActivity() {
     finish()
   }
 
+
+  /** Save domain proof into the standard Downloads collection, no document picker (Android 10+).
+   * Other exports preserve the explicit SAF picker and legacy Android uses it as fallback.
+   */
+  private fun saveVerificationProof(name: String, bytes: ByteArray): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
+    var uri: Uri? = null
+    try {
+      val values = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+        put(MediaStore.MediaColumns.MIME_TYPE, "text/plain")
+        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/")
+        put(MediaStore.MediaColumns.IS_PENDING, 1)
+      }
+      uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+        ?: throw IllegalStateException("Dossier Téléchargements indisponible")
+      contentResolver.openOutputStream(uri, "w")?.use { it.write(bytes) }
+        ?: throw IllegalStateException("Impossible d'écrire le fichier")
+      val ready = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
+      if (contentResolver.update(uri, ready, null, null) != 1) {
+        throw IllegalStateException("Impossible de finaliser le téléchargement")
+      }
+      Toast.makeText(this, "Fichier enregistré dans Téléchargements", Toast.LENGTH_LONG).show()
+    } catch (error: Exception) {
+      uri?.let { try { contentResolver.delete(it, null, null) } catch (_: Exception) {} }
+      Toast.makeText(this, "Téléchargement impossible : " + (error.message ?: "erreur inconnue"), Toast.LENGTH_LONG).show()
+    }
+    return true
+  }
+
   private inner class NavigationBridge {
     @JavascriptInterface
     fun openChat() = runOnUiThread {
@@ -172,8 +206,15 @@ class VergerActivity : FragmentActivity() {
         Toast.makeText(this@VergerActivity, "Terminez d’abord la sauvegarde en cours", Toast.LENGTH_LONG).show()
         return@runOnUiThread
       }
-      pendingSave = bytes
       val safeName = filename.replace(Regex("[^\\p{L}\\p{N}._ -]"), "_").take(140).ifBlank { "verger-export" }
+      if (mime == "text/plain" && safeName == "verger-verification.txt") {
+        if (!Regex("^verger-domain-verification=[A-Za-z0-9_-]{16,128}\\n?$").matches(contents)) {
+          Toast.makeText(this@VergerActivity, "Code de vérification invalide", Toast.LENGTH_LONG).show()
+          return@runOnUiThread
+        }
+        if (saveVerificationProof(safeName, bytes)) return@runOnUiThread
+      }
+      pendingSave = bytes
       try {
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).apply {
           type = mime

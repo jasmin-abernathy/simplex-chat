@@ -53,4 +53,8 @@ bridge_file = root / "apps/multiplatform/android/src/main/java/chat/simplex/app/
 bridge_code = bridge_file.read_text(encoding="utf-8")
 if '"text/plain"' not in bridge_code or 'window.VergerNative' in bridge_code:
     raise AssertionError("Missing secure Android text/plain export for verification proof")
-print("Verger domain verification text file can be saved by Android bridge: OK")
+if 'MediaStore.Downloads.EXTERNAL_CONTENT_URI' not in bridge_code or 'Environment.DIRECTORY_DOWNLOADS' not in bridge_code:
+    raise AssertionError("Domain proof must use Android Downloads without a file picker on Android 10+")
+if 'Build.VERSION.SDK_INT < Build.VERSION_CODES.Q' not in bridge_code:
+    raise AssertionError("Older Android must retain a document picker fallback")
+print("Verger domain verification file saves to Downloads directly on Android 10+: OK")
