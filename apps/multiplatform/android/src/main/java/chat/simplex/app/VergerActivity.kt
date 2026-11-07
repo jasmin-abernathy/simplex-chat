@@ -11,6 +11,9 @@ import android.content.Intent
 import android.graphics.Color
 import android.content.res.ColorStateList
 import android.net.Uri
+import java.net.HttpURLConnection
+import java.net.URL
+import org.json.JSONObject
 import android.os.Bundle
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
@@ -75,7 +78,14 @@ class VergerActivity : FragmentActivity() {
       setTextColor(Color.WHITE)
       backgroundTintList = ColorStateList.valueOf(Color.rgb(49, 92, 73))
       minHeight = (48 * resources.displayMetrics.density).toInt()
-      setOnClickListener { openChat() }
+      setOnClickListener {
+        if (::webView.isInitialized) {
+          webView.evaluateJavascript(
+            "(function(){var b=document.querySelector('[data-action=\\\"open-embedded-chat\\\"]')||document.querySelector('[data-view=\\\"chat\\\"]');if(b)b.click();})();",
+            null
+          )
+        }
+      }
     }
     layout.addView(chatButton, LinearLayout.LayoutParams(-1, -2))
     val loader = WebViewAssetLoader.Builder()
@@ -151,10 +161,51 @@ class VergerActivity : FragmentActivity() {
     webView.loadUrl(if (VergerWebPolicy.isDocument(saved)) saved!! else VergerWebPolicy.HOME)
   }
 
-  private fun openChat() {
+  private fun openChat(token: String, organizationId: String) {
     if (isFinishing || isDestroyed) return
-    startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
-    finish()
+    if (!Regex("^[A-Za-z0-9_-]{30,180}$").matches(token) ||
+        !Regex("^[0-9a-fA-F-]{36}$").matches(organizationId)) {
+      Toast.makeText(this, "Authentification Verger nécessaire", Toast.LENGTH_LONG).show()
+      return
+    }
+    // No untrusted role flag: the server verifies the account and its organization.
+    Thread {
+      var request: HttpURLConnection? = null
+      try {
+        request = (URL("https://app.lepotager.org/verger-api/api/v1/session").openConnection() as HttpURLConnection).apply {
+          requestMethod = "GET"
+          connectTimeout = 8000
+          readTimeout = 8000
+          instanceFollowRedirects = false
+          setRequestProperty("Authorization", "Bearer $token")
+          setRequestProperty("Accept", "application/json")
+        }
+        if (request.responseCode != 200) throw IllegalStateException("Session expirée : reconnectez-vous à Verger")
+        val json = JSONObject(request.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() })
+        val account = json.optJSONObject("account") ?: throw IllegalStateException("Compte non reconnu")
+        val role = account.optString("role")
+        if (account.optString("organizationId") != organizationId ||
+            !account.optBoolean("active") ||
+            role !in setOf("administrator", "facilitator", "member", "reader")) {
+          throw IllegalStateException("Ce compte n'est pas autorisé pour cette association")
+        }
+        runOnUiThread {
+          if (!isFinishing && !isDestroyed) {
+            VergerChatAuthorization.grant(organizationId, role == "administrator")
+            // Keep VergerActivity and its WebView (including its in-memory session) on the back stack.
+            startActivity(Intent(this, MainActivity::class.java))
+          }
+        }
+      } catch (error: Exception) {
+        runOnUiThread {
+          if (!isFinishing && !isDestroyed) {
+            Toast.makeText(this, "Messagerie : " + (error.message ?: "vérification impossible"), Toast.LENGTH_LONG).show()
+          }
+        }
+      } finally {
+        request?.disconnect()
+      }
+    }.start()
   }
 
 
@@ -189,8 +240,8 @@ class VergerActivity : FragmentActivity() {
 
   private inner class NavigationBridge {
     @JavascriptInterface
-    fun openChat() = runOnUiThread {
-      if (VergerWebPolicy.isDocument(webView.url)) this@VergerActivity.openChat()
+    fun openChat(token: String, organizationId: String) = runOnUiThread {
+      if (VergerWebPolicy.isDocument(webView.url)) this@VergerActivity.openChat(token, organizationId)
     }
 
     @JavascriptInterface

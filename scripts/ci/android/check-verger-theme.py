@@ -58,3 +58,19 @@ if 'MediaStore.Downloads.EXTERNAL_CONTENT_URI' not in bridge_code or 'Environmen
 if 'Build.VERSION.SDK_INT < Build.VERSION_CODES.Q' not in bridge_code:
     raise AssertionError("Older Android must retain a document picker fallback")
 print("Verger domain verification file saves to Downloads directly on Android 10+: OK")
+
+# Chat access is verified against the server; untrusted Intents cannot assign a president role.
+main_activity = (root / "apps/multiplatform/android/src/main/java/chat/simplex/app/MainActivity.kt").read_text(encoding="utf-8")
+bridge = bridge_code
+chat_auth = (root / "apps/multiplatform/android/src/main/java/chat/simplex/app/VergerChatAuthorization.kt").read_text(encoding="utf-8")
+group_view = (root / "apps/multiplatform/common/src/commonMain/kotlin/chat/simplex/common/App.kt").read_text(encoding="utf-8")
+assert 'vergerCanCreateGroup = mayCreateAssociationGroup' in main_activity
+assert 'VergerChatAuthorization.consume()' in main_activity
+assert 'fun openChat(token: String, organizationId: String)' in bridge
+assert 'https://app.lepotager.org/verger-api/api/v1/session' in bridge
+assert 'role == "administrator"' in bridge
+assert 'finish()\n  }\n\n  private fun saveVerificationProof' not in bridge
+assert 'AddGroupView(' in group_view and 'onGroupCreated = onGroupSelected' in group_view
+assert 'if (!canCreateGroup)' in group_view
+assert 'groupId.' in main_activity
+print('Verger: chat navigation retains activity; server role authorizes president group creation: OK')

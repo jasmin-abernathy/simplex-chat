@@ -36,7 +36,7 @@ import kotlinx.coroutines.*
 import java.net.URI
 
 @Composable
-fun AddGroupView(chatModel: ChatModel, rh: RemoteHostInfo?, close: () -> Unit, closeAll: () -> Unit) {
+fun AddGroupView(chatModel: ChatModel, rh: RemoteHostInfo?, close: () -> Unit, closeAll: () -> Unit, onGroupCreated: ((Long) -> Unit)? = null) {
   val rhId = rh?.remoteHostId
   val view = LocalMultiplatformView()
   AddGroupLayout(
@@ -47,6 +47,7 @@ fun AddGroupView(chatModel: ChatModel, rh: RemoteHostInfo?, close: () -> Unit, c
         if (groupInfo != null) {
           withContext(Dispatchers.Main) {
             chatModel.chatsContext.updateGroup(rhId = rhId, groupInfo)
+            onGroupCreated?.invoke(groupInfo.groupId)
             openGroupChat(rhId, groupInfo.groupId)
           }
           setGroupMembers(rhId, groupInfo, chatModel)

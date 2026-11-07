@@ -28,6 +28,10 @@ import chat.simplex.res.MR
 import java.lang.ref.WeakReference
 
 class MainActivity: FragmentActivity() {
+  private var verifiedChatOrganizationId: String? = null
+  private var mayCreateAssociationGroup: Boolean = false
+  private fun groupPreferenceKey(): String = "groupId." + (verifiedChatOrganizationId ?: "unverified")
+
   companion object {
     const val OLD_ANDROID_UI_FLAGS = View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
   }
@@ -49,6 +53,10 @@ class MainActivity: FragmentActivity() {
       window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
     }
     super.onCreate(savedInstanceState)
+    val grant = if (savedInstanceState == null) VergerChatAuthorization.consume() else null
+    verifiedChatOrganizationId = savedInstanceState?.getString("verifiedChatOrganizationId") ?: grant?.organizationId
+    mayCreateAssociationGroup = savedInstanceState?.getBoolean("mayCreateAssociationGroup")
+      ?: (grant?.canCreateGroup == true)
     // testJson()
     // When call ended and orientation changes, it re-process old intent, it's unneeded.
     // Only needed to be processed on first creation of activity
@@ -68,18 +76,19 @@ class MainActivity: FragmentActivity() {
     setContent {
       Column(Modifier.fillMaxSize()) {
         TextButton(
-          onClick = { startActivity(Intent(this@MainActivity, VergerActivity::class.java)) },
+          onClick = { finish() },
           modifier = Modifier.fillMaxWidth().statusBarsPadding()
         ) { Text("Retour aux outils du Verger") }
         val groupPrefs = remember { getSharedPreferences("verger-group", MODE_PRIVATE) }
-        val boundGroup = remember { mutableStateOf(groupPrefs.getLong("groupId", -1).takeIf { it > 0 }) }
+        val boundGroup = remember { mutableStateOf(groupPrefs.getLong(groupPreferenceKey(), -1).takeIf { it > 0 }) }
         Box(Modifier.weight(1f)) {
           AppScreen(
             vergerGroupOnly = true,
             vergerGroupId = boundGroup.value,
+            vergerCanCreateGroup = mayCreateAssociationGroup,
             onVergerGroupSelected = { selected ->
               if (boundGroup.value == null && selected > 0) {
-                groupPrefs.edit().putLong("groupId", selected).apply()
+                groupPrefs.edit().putLong(groupPreferenceKey(), selected).apply()
                 boundGroup.value = selected
               }
             }
@@ -91,11 +100,17 @@ class MainActivity: FragmentActivity() {
     SimplexApp.context.schedulePeriodicWakeUp()
   }
 
+  override fun onSaveInstanceState(outState: Bundle) {
+    outState.putString("verifiedChatOrganizationId", verifiedChatOrganizationId)
+    outState.putBoolean("mayCreateAssociationGroup", mayCreateAssociationGroup)
+    super.onSaveInstanceState(outState)
+  }
+
   /** Les liens vers des contacts ou d'autres groupes ne doivent pas ouvrir
    * un second espace de messagerie dans le Verger. */
   private fun processVergerIntent(intent: Intent?) {
     if (intent?.action == Intent.ACTION_VIEW) {
-      val bound = getSharedPreferences("verger-group", MODE_PRIVATE).getLong("groupId", -1) > 0
+      val bound = getSharedPreferences("verger-group", MODE_PRIVATE).getLong(groupPreferenceKey(), -1) > 0
       if (bound || !VergerGroupPolicy.isGroupInvitation(intent.data?.toString())) {
         Toast.makeText(this, "Lien refusé : seul le groupe privé de l'association est accessible", Toast.LENGTH_LONG).show()
         return
@@ -131,6 +146,13 @@ class MainActivity: FragmentActivity() {
   }
 
   override fun onBackPressed() {
+    // At the root of the internal messenger, return to the existing authenticated VergerActivity.
+    if (chatModel.chatId.value == null &&
+        !onBackPressedDispatcher.hasEnabledCallbacks() &&
+        ModalManager.start.openModalCount() == 0) {
+      finish()
+      return
+    }
     val canFinishActivity = (
         onBackPressedDispatcher.hasEnabledCallbacks() // Has something to do in a backstack
             || Build.VERSION.SDK_INT >= Build.VERSION_CODES.R // Android 11 or above

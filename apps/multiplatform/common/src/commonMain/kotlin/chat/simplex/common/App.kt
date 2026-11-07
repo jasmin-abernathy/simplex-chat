@@ -49,6 +49,7 @@ fun AppScreen(
   vergerGroupOnly: Boolean = false,
   vergerGroupId: Long? = null,
   onVergerGroupSelected: (Long) -> Unit = {},
+  vergerCanCreateGroup: Boolean = false,
 ) {
   AppBarHandler.appBarMaxHeightPx = with(LocalDensity.current) { AppBarHeight.roundToPx() }
   SimpleXTheme(vergerTheme = vergerGroupOnly) {
@@ -76,7 +77,7 @@ fun AppScreen(
               drawRect(Color.Black,  topLeft = Offset(-(paddingStart + cutoutMax).toPx(), 0f), Size(size.width + (paddingStart + cutoutMax).toPx() + (paddingEnd + cutoutMax).toPx(), size.height))
             }
           }) {
-            MainScreen(vergerGroupOnly, vergerGroupId, onVergerGroupSelected)
+            MainScreen(vergerGroupOnly, vergerGroupId, onVergerGroupSelected, vergerCanCreateGroup)
           }
         }
       }
@@ -90,6 +91,7 @@ fun MainScreen(
   vergerGroupOnly: Boolean = false,
   vergerGroupId: Long? = null,
   onVergerGroupSelected: (Long) -> Unit = {},
+  vergerCanCreateGroup: Boolean = false,
 ) {
   // Même si un menu SimpleX essaie d'ouvrir un autre fil, le Verger n'affiche
   // que le groupe explicitement associé sur cet appareil.
@@ -186,7 +188,7 @@ fun MainScreen(
           }
           if (appPlatform.isAndroid) {
             AndroidWrapInCallLayout {
-              AndroidScreen(userPickerState, vergerGroupOnly, vergerGroupId, onVergerGroupSelected)
+              AndroidScreen(userPickerState, vergerGroupOnly, vergerGroupId, onVergerGroupSelected, vergerCanCreateGroup)
             }
           } else {
             DesktopScreen(userPickerState)
@@ -335,6 +337,7 @@ fun AndroidScreen(
   vergerGroupOnly: Boolean = false,
   vergerGroupId: Long? = null,
   onVergerGroupSelected: (Long) -> Unit = {},
+  vergerCanCreateGroup: Boolean = false,
 ) {
   BoxWithConstraints {
     val currentChatId = remember { mutableStateOf(chatModel.chatId.value) }
@@ -354,7 +357,7 @@ fun AndroidScreen(
           translationX = -minOf(offset.value.dp, maxWidth).toPx()
         }
     ) {
-      StartPartOfScreen(userPickerState, vergerGroupOnly, vergerGroupId, onVergerGroupSelected)
+      StartPartOfScreen(userPickerState, vergerGroupOnly, vergerGroupId, onVergerGroupSelected, vergerCanCreateGroup)
     }
     val scope = rememberCoroutineScope()
     val onComposed: suspend (chatId: String?) -> Unit = { chatId ->
@@ -396,6 +399,7 @@ fun StartPartOfScreen(
   vergerGroupOnly: Boolean = false,
   vergerGroupId: Long? = null,
   onVergerGroupSelected: (Long) -> Unit = {},
+  vergerCanCreateGroup: Boolean = false,
 ) {
   if (chatModel.setDeliveryReceipts.value) {
     CompositionLocalProvider(LocalAppBarHandler provides rememberAppBarHandler()) {
@@ -406,7 +410,7 @@ fun StartPartOfScreen(
     if (vergerGroupOnly || chatModel.sharedContent.value == null) {
       CompositionLocalProvider(LocalAppBarHandler provides rememberAppBarHandler()) {
         if (vergerGroupOnly) {
-          VergerClosedGroupList(vergerGroupId, onVergerGroupSelected)
+          VergerClosedGroupList(vergerGroupId, onVergerGroupSelected, vergerCanCreateGroup)
         } else {
           ChatListView(chatModel, userPickerState, AppLock::setPerformLA, stopped)
         }
@@ -421,10 +425,10 @@ fun StartPartOfScreen(
 }
 
 
-/** Application du groupe privé de l'association : ni recherche de contacts,
- * ni annuaire, ni création libre de nouvelles conversations ou groupes. */
+/** Groupe privé : pas d'annuaire public et un seul groupe associé à l'organisation.
+ * La création est réservée à la présidence vérifiée par le serveur Verger. */
 @Composable
-private fun VergerClosedGroupList(groupId: Long?, onGroupSelected: (Long) -> Unit) {
+private fun VergerClosedGroupList(groupId: Long?, onGroupSelected: (Long) -> Unit, canCreateGroup: Boolean) {
   val groups = chatModel.chats.value.mapNotNull { it.chatInfo as? ChatInfo.Group }
     .filter { it.groupInfo.membership.memberActive }
   val group = groups.firstOrNull { it.groupInfo.groupId == groupId }
@@ -446,6 +450,24 @@ private fun VergerClosedGroupList(groupId: Long?, onGroupSelected: (Long) -> Uni
         Text("Le groupe associé n'est plus disponible sur cet appareil. Vérifiez votre profil et votre accès avec un responsable.")
       }
     } else {
+      if (canCreateGroup) {
+        Text("Vous représentez la présidence de l'association. Créez son groupe privé ici : aucun lien d'invitation n'est nécessaire.")
+        Button(
+          onClick = {
+            ModalManager.start.showCustomModal { close ->
+              AddGroupView(
+                chatModel,
+                chatModel.currentRemoteHost.value,
+                close,
+                closeAll = { ModalManager.start.closeModals() },
+                onGroupCreated = onGroupSelected
+              )
+            }
+          },
+          enabled = chatModel.chatRunning.value == true,
+          modifier = Modifier.fillMaxWidth()
+        ) { Text("Créer le groupe de l'association") }
+      }
       if (groups.isNotEmpty()) {
         Text("Choisissez le groupe privé de votre association parmi ceux que vous avez déjà rejoints :")
         groups.forEach { candidate ->
@@ -457,8 +479,9 @@ private fun VergerClosedGroupList(groupId: Long?, onGroupSelected: (Long) -> Uni
           }
         }
       }
-      Text("Vous n'avez pas encore rejoint votre groupe ? Demandez un lien privé aux responsables, puis collez-le ci-dessous.")
-      OutlinedTextField(
+      if (!canCreateGroup) {
+        Text("Vous n'avez pas encore rejoint votre groupe ? Demandez un lien privé aux responsables, puis collez-le ci-dessous.")
+        OutlinedTextField(
         value = invitation.value,
         onValueChange = { invitation.value = it.take(16384) },
         modifier = Modifier.fillMaxWidth(),
@@ -476,8 +499,9 @@ private fun VergerClosedGroupList(groupId: Long?, onGroupSelected: (Long) -> Uni
       if (invitation.value.isNotBlank() && !validInvitation) {
         Text("Ce lien ne correspond pas à une invitation de groupe compatible.", color = MaterialTheme.colors.error)
       }
+      }
     }
-    Text("Les membres ne peuvent pas créer de groupe depuis cette interface. La gestion des invitations et des rôles appartient aux responsables du groupe.")
+    Text(if (canCreateGroup) "La présidence gère les invitations et les rôles du groupe." else "Seules les personnes habilitées peuvent créer un groupe. Demandez une invitation à votre association.")
   }
 }
 @Composable
