@@ -161,7 +161,7 @@ class VergerActivity : FragmentActivity() {
     webView.loadUrl(if (VergerWebPolicy.isDocument(saved)) saved!! else VergerWebPolicy.HOME)
   }
 
-  private fun openChat(token: String, organizationId: String) {
+  private fun openChat(token: String, organizationId: String, accentColor: String) {
     if (isFinishing || isDestroyed) return
     if (!Regex("^[A-Za-z0-9_-]{30,180}$").matches(token) ||
         !Regex("^[0-9a-fA-F-]{36}$").matches(organizationId)) {
@@ -191,7 +191,7 @@ class VergerActivity : FragmentActivity() {
         }
         runOnUiThread {
           if (!isFinishing && !isDestroyed) {
-            VergerChatAuthorization.grant(organizationId, role == "administrator")
+            VergerChatAuthorization.grant(organizationId, role == "administrator", accentColor.takeIf { Regex("^#[0-9a-fA-F]{6}$").matches(it) })
             // Keep VergerActivity and its WebView (including its in-memory session) on the back stack.
             startActivity(Intent(this, MainActivity::class.java))
           }
@@ -240,8 +240,8 @@ class VergerActivity : FragmentActivity() {
 
   private inner class NavigationBridge {
     @JavascriptInterface
-    fun openChat(token: String, organizationId: String) = runOnUiThread {
-      if (VergerWebPolicy.isDocument(webView.url)) this@VergerActivity.openChat(token, organizationId)
+    fun openChat(token: String, organizationId: String, accentColor: String) = runOnUiThread {
+      if (VergerWebPolicy.isDocument(webView.url)) this@VergerActivity.openChat(token, organizationId, accentColor)
     }
 
     @JavascriptInterface

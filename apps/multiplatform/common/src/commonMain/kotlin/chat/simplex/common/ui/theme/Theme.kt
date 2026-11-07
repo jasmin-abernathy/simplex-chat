@@ -779,6 +779,74 @@ val VergerDarkAppColors = AppColors(
   receivedMessage = Color(0xFF28322D), receivedQuote = Color(0xFF37443B),
 )
 
+
+/** Accent de l'association : des nuances sobres, indépendantes des permissions. */
+private fun vergerAccentColor(hex: String?): Color? {
+  if (hex == null || !Regex("^#[0-9a-fA-F]{6}$").matches(hex)) return null
+  return Color((0xFF shl 24) or hex.drop(1).toInt(16))
+}
+private fun vergerBlend(a: Color, b: Color, fraction: Float): Color = Color(
+  a.red + (b.red - a.red) * fraction,
+  a.green + (b.green - a.green) * fraction,
+  a.blue + (b.blue - a.blue) * fraction,
+  1f
+)
+private fun vergerContrast(a: Color, b: Color): Float {
+  val first = a.luminance()
+  val second = b.luminance()
+  return (maxOf(first, second) + .05f) / (minOf(first, second) + .05f)
+}
+private fun vergerReadable(color: Color, background: Color, toward: Color): Color {
+  if (vergerContrast(color, background) >= 4.6f) return color
+  var low = 0f
+  var high = 1f
+  repeat(16) {
+    val mid = (low + high) / 2f
+    if (vergerContrast(vergerBlend(color, toward, mid), background) >= 4.6f) high = mid else low = mid
+  }
+  return vergerBlend(color, toward, high)
+}
+private fun vergerPalette(light: Boolean, accent: String?): Pair<Colors, AppColors> {
+  val color = vergerAccentColor(accent)
+  if (color == null) return if (light) VergerLightColorPalette to VergerLightAppColors
+      else VergerDarkColorPalette to VergerDarkAppColors
+  if (light) {
+    val main = vergerReadable(color, Color.White, Color.Black)
+    val secondary = vergerReadable(vergerBlend(color, Color.Gray, .25f), Color.White, Color.Black)
+    return VergerLightColorPalette.copy(
+      primary = main, primaryVariant = vergerReadable(vergerBlend(color, Color.Black, .16f), Color.White, Color.Black),
+      secondary = secondary, secondaryVariant = vergerBlend(color, Color.White, .90f),
+      background = vergerBlend(color, Color.White, .954f),
+      surface = vergerBlend(color, Color.White, .982f),
+      onPrimary = Color.White, onSecondary = Color.White
+    ) to AppColors(
+      title = main, primaryVariant2 = vergerBlend(color, Color.White, .82f),
+      sentMessage = vergerBlend(color, Color.White, .82f),
+      sentQuote = vergerBlend(color, Color.White, .76f),
+      receivedMessage = vergerBlend(color, Color.White, .93f),
+      receivedQuote = vergerBlend(color, Color.White, .88f)
+    )
+  }
+  val foreground = Color(0xFF142019)
+  val main = vergerReadable(color, foreground, Color.White)
+  val background = vergerBlend(Color(0xFF151C19), color, .07f)
+  val surface = vergerBlend(Color(0xFF202923), color, .09f)
+  return VergerDarkColorPalette.copy(
+    primary = main,
+    primaryVariant = vergerReadable(vergerBlend(color, Color.White, .15f), foreground, Color.White),
+    secondary = vergerReadable(vergerBlend(color, Color.White, .20f), foreground, Color.White),
+    secondaryVariant = vergerBlend(surface, color, .22f),
+    background = background, surface = surface,
+    onPrimary = foreground, onSecondary = foreground
+  ) to AppColors(
+    title = main, primaryVariant2 = vergerBlend(background, color, .20f),
+    sentMessage = vergerBlend(background, color, .23f),
+    sentQuote = vergerBlend(background, color, .30f),
+    receivedMessage = vergerBlend(background, color, .09f),
+    receivedQuote = vergerBlend(background, color, .15f)
+  )
+}
+
 var systemInDarkThemeCurrently: Boolean = isInNightMode()
 
 // Spec: spec/services/theme.md#CurrentColors
@@ -791,6 +859,7 @@ fun isInDarkTheme(): Boolean = !CurrentColors.collectAsState().value.colors.isLi
 expect fun isSystemInDarkTheme(): Boolean
 
 internal val LocalVergerVisuals = staticCompositionLocalOf { false }
+internal val LocalVergerAccent = staticCompositionLocalOf<String?> { null }
 internal val LocalAppColors = staticCompositionLocalOf { LightColorPaletteApp }
 internal val LocalAppWallpaper = staticCompositionLocalOf { AppWallpaper() }
 
@@ -829,7 +898,7 @@ fun reactOnDarkThemeChanges(isDark: Boolean) {
 
 // Spec: spec/services/theme.md#SimpleXTheme
 @Composable
-fun SimpleXTheme(darkTheme: Boolean? = null, vergerTheme: Boolean = false, content: @Composable () -> Unit) {
+fun SimpleXTheme(darkTheme: Boolean? = null, vergerTheme: Boolean = false, vergerAccent: String? = null, content: @Composable () -> Unit) {
 // TODO: Fix preview working with dark/light theme
 
 //  LaunchedEffect(darkTheme) {
@@ -853,12 +922,9 @@ fun SimpleXTheme(darkTheme: Boolean? = null, vergerTheme: Boolean = false, conte
         ThemeManager.applyTheme(appPrefs.currentTheme.get()!!)
       }
   }
-  val activeColors = if (vergerTheme) {
-    if (theme.colors.isLight) VergerLightColorPalette else VergerDarkColorPalette
-  } else theme.colors
-  val activeAppColors = if (vergerTheme) {
-    if (theme.colors.isLight) VergerLightAppColors else VergerDarkAppColors
-  } else theme.appColors
+  val vergerColors = if (vergerTheme) vergerPalette(theme.colors.isLight, vergerAccent) else null
+  val activeColors = vergerColors?.first ?: theme.colors
+  val activeAppColors = vergerColors?.second ?: theme.appColors
   val activeWallpaper = if (vergerTheme) AppWallpaper() else theme.wallpaper
   MaterialTheme(
     colors = activeColors,
@@ -878,6 +944,7 @@ fun SimpleXTheme(darkTheme: Boolean? = null, vergerTheme: Boolean = false, conte
       }.apply { updateWallpaperFrom(activeWallpaper) }
       CompositionLocalProvider(
         LocalVergerVisuals provides vergerTheme,
+        LocalVergerAccent provides (if (vergerTheme) vergerAccent else null),
         LocalContentColor provides MaterialTheme.colors.onBackground,
         LocalAppColors provides rememberedAppColors,
         LocalAppWallpaper provides rememberedWallpaper,
@@ -891,12 +958,9 @@ fun SimpleXTheme(darkTheme: Boolean? = null, vergerTheme: Boolean = false, conte
 @Composable
 fun SimpleXThemeOverride(theme: ThemeManager.ActiveTheme, content: @Composable () -> Unit) {
   val vergerTheme = LocalVergerVisuals.current
-  val activeColors = if (vergerTheme) {
-    if (theme.colors.isLight) VergerLightColorPalette else VergerDarkColorPalette
-  } else theme.colors
-  val activeAppColors = if (vergerTheme) {
-    if (theme.colors.isLight) VergerLightAppColors else VergerDarkAppColors
-  } else theme.appColors
+  val vergerColors = if (vergerTheme) vergerPalette(theme.colors.isLight, LocalVergerAccent.current) else null
+  val activeColors = vergerColors?.first ?: theme.colors
+  val activeAppColors = vergerColors?.second ?: theme.appColors
   val activeWallpaper = if (vergerTheme) AppWallpaper() else theme.wallpaper
   MaterialTheme(
     colors = activeColors,

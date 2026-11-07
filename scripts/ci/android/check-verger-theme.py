@@ -74,3 +74,9 @@ assert 'AddGroupView(' in group_view and 'onGroupCreated = onGroupSelected' in g
 assert 'if (!canCreateGroup)' in group_view
 assert 'groupId.' in main_activity
 print('Verger: chat navigation retains activity; server role authorizes president group creation: OK')
+
+assert 'vergerPalette(theme.colors.isLight, vergerAccent)' in code
+assert 'vergerPalette(theme.colors.isLight, LocalVergerAccent.current)' in code
+assert 'vergerAccent = associationAccent' in main_activity
+assert 'fun openChat(token: String, organizationId: String, accentColor: String)' in bridge
+print('Verger: association accent reaches native chat, including nested conversation themes: OK')

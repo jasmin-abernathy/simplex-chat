@@ -8,12 +8,12 @@ import android.os.SystemClock
  * Never persisted, never accepts role flags from external Intents.
  */
 object VergerChatAuthorization {
-  data class Grant(val organizationId: String, val canCreateGroup: Boolean)
+  data class Grant(val organizationId: String, val canCreateGroup: Boolean, val accentColor: String?)
   private var pending: Pair<Grant, Long>? = null
 
   @Synchronized
-  fun grant(organizationId: String, canCreateGroup: Boolean) {
-    pending = Grant(organizationId, canCreateGroup) to SystemClock.elapsedRealtime()
+  fun grant(organizationId: String, canCreateGroup: Boolean, accentColor: String?) {
+    pending = Grant(organizationId, canCreateGroup, accentColor) to SystemClock.elapsedRealtime()
   }
 
   @Synchronized

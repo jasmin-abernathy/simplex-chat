@@ -30,6 +30,7 @@ import java.lang.ref.WeakReference
 class MainActivity: FragmentActivity() {
   private var verifiedChatOrganizationId: String? = null
   private var mayCreateAssociationGroup: Boolean = false
+  private var associationAccent: String? = null
   private fun groupPreferenceKey(): String = "groupId." + (verifiedChatOrganizationId ?: "unverified")
 
   companion object {
@@ -57,6 +58,7 @@ class MainActivity: FragmentActivity() {
     verifiedChatOrganizationId = savedInstanceState?.getString("verifiedChatOrganizationId") ?: grant?.organizationId
     mayCreateAssociationGroup = savedInstanceState?.getBoolean("mayCreateAssociationGroup")
       ?: (grant?.canCreateGroup == true)
+    associationAccent = savedInstanceState?.getString("associationAccent") ?: grant?.accentColor
     // testJson()
     // When call ended and orientation changes, it re-process old intent, it's unneeded.
     // Only needed to be processed on first creation of activity
@@ -86,6 +88,7 @@ class MainActivity: FragmentActivity() {
             vergerGroupOnly = true,
             vergerGroupId = boundGroup.value,
             vergerCanCreateGroup = mayCreateAssociationGroup,
+            vergerAccent = associationAccent,
             onVergerGroupSelected = { selected ->
               if (boundGroup.value == null && selected > 0) {
                 groupPrefs.edit().putLong(groupPreferenceKey(), selected).apply()
@@ -103,6 +106,7 @@ class MainActivity: FragmentActivity() {
   override fun onSaveInstanceState(outState: Bundle) {
     outState.putString("verifiedChatOrganizationId", verifiedChatOrganizationId)
     outState.putBoolean("mayCreateAssociationGroup", mayCreateAssociationGroup)
+    outState.putString("associationAccent", associationAccent)
     super.onSaveInstanceState(outState)
   }
 
