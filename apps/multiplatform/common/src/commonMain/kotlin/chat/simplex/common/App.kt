@@ -434,6 +434,25 @@ private fun VergerClosedGroupList(groupId: Long?, onGroupSelected: (Long) -> Uni
     .filter { it.groupInfo.membership.memberActive }
   val group = groups.firstOrNull { it.groupInfo.groupId == groupId }
   val invitation = rememberSaveable { mutableStateOf("") }
+  val groupCreationOpened = rememberSaveable { mutableStateOf(false) }
+  val openGroupCreation: () -> Unit = {
+    ModalManager.start.showCustomModal { close ->
+      AddGroupView(
+        chatModel,
+        chatModel.currentRemoteHost.value,
+        close,
+        closeAll = { ModalManager.start.closeModals() },
+        onGroupCreated = onGroupSelected
+      )
+    }
+  }
+  LaunchedEffect(canCreateGroup, groupId, chatModel.chatRunning.value) {
+    if (canCreateGroup && groupId == null && groups.isEmpty() &&
+        chatModel.chatRunning.value == true && !groupCreationOpened.value) {
+      groupCreationOpened.value = true
+      openGroupCreation()
+    }
+  }
   Column(
     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
     verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -454,17 +473,7 @@ private fun VergerClosedGroupList(groupId: Long?, onGroupSelected: (Long) -> Uni
       if (canCreateGroup) {
         Text("Vous représentez la présidence de l'association. Créez son groupe privé ici : aucun lien d'invitation n'est nécessaire.")
         Button(
-          onClick = {
-            ModalManager.start.showCustomModal { close ->
-              AddGroupView(
-                chatModel,
-                chatModel.currentRemoteHost.value,
-                close,
-                closeAll = { ModalManager.start.closeModals() },
-                onGroupCreated = onGroupSelected
-              )
-            }
-          },
+          onClick = openGroupCreation,
           enabled = chatModel.chatRunning.value == true,
           modifier = Modifier.fillMaxWidth()
         ) { Text("Créer le groupe de l'association") }
