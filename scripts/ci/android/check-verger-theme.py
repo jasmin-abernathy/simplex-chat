@@ -43,7 +43,7 @@ for variant, method in (("Light", "lightColors"), ("Dark", "darkColors")):
         raise AssertionError(f"Missing Verger {variant} message bubble palette")
 
 app = app_file.read_text(encoding="utf-8")
-if "SimpleXTheme(vergerTheme = vergerGroupOnly)" not in app:
+if "SimpleXTheme(vergerTheme = vergerGroupOnly, vergerAccent = vergerAccent)" not in app:
     raise AssertionError("Verger palette not scoped to the association messaging")
 if "LocalVergerVisuals provides vergerTheme" not in code:
     raise AssertionError("Verger palette may be overridden by nested chat themes")
@@ -66,7 +66,7 @@ chat_auth = (root / "apps/multiplatform/android/src/main/java/chat/simplex/app/V
 group_view = (root / "apps/multiplatform/common/src/commonMain/kotlin/chat/simplex/common/App.kt").read_text(encoding="utf-8")
 assert 'vergerCanCreateGroup = mayCreateAssociationGroup' in main_activity
 assert 'VergerChatAuthorization.consume()' in main_activity
-assert 'fun openChat(token: String, organizationId: String)' in bridge
+assert 'fun openChat(token: String, organizationId: String, accentColor: String)' in bridge
 assert 'https://app.lepotager.org/verger-api/api/v1/session' in bridge
 assert 'role == "administrator"' in bridge
 assert 'finish()\n  }\n\n  private fun saveVerificationProof' not in bridge
