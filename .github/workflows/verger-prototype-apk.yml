@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: jasmin-abernathy/verger-associations
-          ref: ff2fd65490b0c324f3f87a0414d00c5fc1f75f8e
+          ref: 2552252ab8e9a0bcc15d8d389368814836b26f15
           path: verger-source
           persist-credentials: false
       - uses: actions/setup-node@v6
@@ -76,7 +76,7 @@ jobs:
           python3 scripts/ci/android/check-installable-manifest.py "$RUNNER_TEMP/apk-manifest"
           unzip -l deliverable/verger-simplex-prototype.apk > "$RUNNER_TEMP/apk-files"
           for entry in assets/verger/index.html lib/arm64-v8a/libapp-lib.so lib/arm64-v8a/libsimplex.so lib/arm64-v8a/libsupport.so; do grep -F "$entry" "$RUNNER_TEMP/apk-files"; done
-          printf 'SimpleX source: %s\nVerger source: ff2fd65490b0c324f3f87a0414d00c5fc1f75f8e\n' "$GITHUB_SHA" > deliverable/SOURCES.txt
+          printf 'SimpleX source: %s\nVerger source: 2552252ab8e9a0bcc15d8d389368814836b26f15\n' "$GITHUB_SHA" > deliverable/SOURCES.txt
           cp docs/VERGER-PROTOTYPE.md deliverable/README.md
           cd deliverable
           sha256sum verger-simplex-prototype.apk > SHA256SUMS
