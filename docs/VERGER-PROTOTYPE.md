@@ -65,3 +65,9 @@ Le sélecteur Android accepte désormais explicitement les exports `text/plain` 
 ## Fichier de vérification : destination Android
 
 Sur Android 10 et versions supérieures, le bouton « Télécharger verger-verification.txt » utilise MediaStore et dépose le fichier directement dans **Téléchargements**, sans demander de choisir un dossier. Un message confirme l’écriture réussie. Le contenu est vérifié et doit correspondre à un code de vérification temporaire. Sur Android 8 et 9, le sélecteur « Enregistrer sous » est conservé en repli. Les autres exports de l'application continuent à utiliser le sélecteur Android. Si un fichier du même nom existe déjà, vérifier le nom effectivement attribué par Android avant de le copier sur l’hébergement.
+
+## Entrée par responsabilité et téléchargement sans sélection de dossier
+
+Le lancement de Verger commence par trois choix **dans cet ordre** : Bénévoles, Bureau / fondateurs, Présidence / coprésidence. Les deux premiers ouvrent la connexion, un formulaire de demande d'accès, ou l'activation d'une invitation. Le troisième permet une inscription fondée sur la preuve du domaine ou une connexion existante. Les rôles serveur, et non les choix visuels, décident des droits : membre, facilitateur, administrateur. Les demandes sont examinées dans l'espace admin et peuvent aboutir à un code d'invitation à transmettre manuellement. Pas de notification automatique. Le partage des données métier entre appareils reste à sécuriser et synchroniser avant production.
+
+Sur Android 10 et versions ultérieures, le code de vérification de domaine est enregistré dans Téléchargements (MediaStore, sans sélecteur de dossier). Les autres exports continuent à employer le sélecteur système. L'APK contient désormais le parcours de rôles et les API de demandes d'accès, en plus de la correction Android.
