@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: jasmin-abernathy/verger-associations
-          ref: 2552252ab8e9a0bcc15d8d389368814836b26f15
+          ref: cf40468029e36203fa21e53b6d7fa360a8d44bbf
           path: verger-source
           persist-credentials: false
       - uses: actions/setup-node@v6
@@ -44,6 +44,17 @@ jobs:
           mkdir -p ../../../apps/multiplatform/android/src/main/assets/verger
           cp -R dist/. ../../../apps/multiplatform/android/src/main/assets/verger/
           cp ../../LICENSE ../../../apps/multiplatform/android/src/main/assets/verger/LICENSE.txt
+      - name: Wait for the verified native core archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in $(seq 1 60); do
+            count=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/40937013106/artifacts" --jq '[.artifacts[] | select(.name == "vault-test-native-core" and .expired == false)] | length')
+            if [ "$count" = "1" ]; then exit 0; fi
+            sleep 20
+          done
+          echo "Native core archive unavailable. Check the native build in Actions run 40937013106."
+          exit 1
       - uses: actions/download-artifact@v4
         with:
           name: vault-test-native-core
@@ -76,7 +87,7 @@ jobs:
           python3 scripts/ci/android/check-installable-manifest.py "$RUNNER_TEMP/apk-manifest"
           unzip -l deliverable/verger-simplex-prototype.apk > "$RUNNER_TEMP/apk-files"
           for entry in assets/verger/index.html lib/arm64-v8a/libapp-lib.so lib/arm64-v8a/libsimplex.so lib/arm64-v8a/libsupport.so; do grep -F "$entry" "$RUNNER_TEMP/apk-files"; done
-          printf 'SimpleX source: %s\nVerger source: 2552252ab8e9a0bcc15d8d389368814836b26f15\n' "$GITHUB_SHA" > deliverable/SOURCES.txt
+          printf 'SimpleX source: %s\nVerger source: cf40468029e36203fa21e53b6d7fa360a8d44bbf\n' "$GITHUB_SHA" > deliverable/SOURCES.txt
           cp docs/VERGER-PROTOTYPE.md deliverable/README.md
           cd deliverable
           sha256sum verger-simplex-prototype.apk > SHA256SUMS
