@@ -12,7 +12,7 @@ concurrency:
 jobs:
   apk:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v6
         with:
@@ -48,7 +48,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for attempt in $(seq 1 60); do
+          for attempt in $(seq 1 120); do
             count=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/40937013106/artifacts" --jq '[.artifacts[] | select(.name == "vault-test-native-core" and .expired == false)] | length')
             if [ "$count" = "1" ]; then exit 0; fi
             sleep 20
