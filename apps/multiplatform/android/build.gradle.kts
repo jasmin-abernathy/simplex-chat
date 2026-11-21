@@ -18,8 +18,10 @@ android {
         targetSdk = 35
         // !!!
         // skip version code after release to F-Droid, as it uses two version codes
-        versionCode = (extra["android.version_code"] as String).toInt()
-        versionName = extra["android.version_name"] as String
+        versionCode = providers.gradleProperty("vergerVersionCode").orNull?.toInt()
+            ?: (extra["android.version_code"] as String).toInt()
+        versionName = providers.gradleProperty("vergerVersionName").orNull
+            ?: (extra["android.version_name"] as String)
 
         testInstrumentationRunner = "android.support.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -187,6 +189,7 @@ dependencies {
     //implementation("androidx.compose.ui:ui-util:$compose_version")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     //androidTestImplementation("androidx.compose.ui:ui-test-junit4:$compose_version")

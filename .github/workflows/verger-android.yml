@@ -1,0 +1,139 @@
+name: Verger Associations Android
+on:
+  push:
+    tags: ['verger-build-*-v*']
+  workflow_dispatch:
+    inputs:
+      web_commit:
+        description: Commit Verger Associations à intégrer (SHA complet)
+        required: true
+        type: string
+      version_code:
+        description: Code Android croissant (tag GitHub android-<code>)
+        required: true
+        type: string
+      version_name:
+        description: Version affichée (par exemple 0.4.0)
+        required: true
+        type: string
+      native_run:
+        description: Exécution Actions contenant l’archive native vérifiée
+        required: true
+        type: string
+        default: '40937013106'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: verger-distribution
+  cancel-in-progress: false
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Validate distribution configuration
+        id: version
+        env:
+          VERSION_CODE: ${{ inputs.version_code }}
+          VERSION_NAME: ${{ inputs.version_name }}
+          WEB_COMMIT: ${{ inputs.web_commit || 'f7a2c6024f1376218d21581019aa4c7ae539b477' }}
+          VERGER_KEYSTORE: ${{ secrets.VERGER_ANDROID_KEYSTORE_BASE64 }}
+          VERGER_KEYSTORE_PASSWORD: ${{ secrets.VERGER_ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          test -n "$VERGER_KEYSTORE"
+          test -n "$VERGER_KEYSTORE_PASSWORD"
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            [[ "$GITHUB_REF_NAME" =~ ^verger-build-([1-9][0-9]{0,9})-v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || exit 1
+            VERSION_CODE="${BASH_REMATCH[1]}"
+            VERSION_NAME="${BASH_REMATCH[2]}"
+          fi
+          [[ "$VERSION_CODE" =~ ^[1-9][0-9]{0,9}$ ]] && (( VERSION_CODE <= 2100000000 )) || exit 1
+          [[ "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          [[ "$WEB_COMMIT" =~ ^[a-f0-9]{40}$ ]] || exit 1
+          {
+            echo "code=$VERSION_CODE"
+            echo "name=$VERSION_NAME"
+            echo "web_commit=$WEB_COMMIT"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify cached native core matches source
+        run: git diff --exit-code 682e0b516be4e5852194a2a37e8267d82692dcf9 HEAD -- src cabal.project simplex-chat.cabal flake.nix flake.lock
+      - uses: actions/checkout@v6
+        with:
+          repository: jasmin-abernathy/verger-associations
+          ref: ${{ steps.version.outputs.web_commit }}
+          path: verger-source
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Check Verger messaging palette and contrast
+        run: python3 scripts/ci/android/check-verger-theme.py
+      - name: Test and bundle Verger
+        working-directory: verger-source/apps/verger-pwa
+        env:
+          VITE_VERGER_API_URL: https://app.lepotager.org/verger-api
+        run: |
+          npm ci
+          npm run check
+          npm run build
+          mkdir -p ../../../apps/multiplatform/android/src/main/assets/verger
+          cp -R dist/. ../../../apps/multiplatform/android/src/main/assets/verger/
+          cp ../../LICENSE ../../../apps/multiplatform/android/src/main/assets/verger/LICENSE.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: vault-test-native-core
+          run-id: ${{ inputs.native_run || '40937013106' }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/core
+      - name: Install verified source-built native libraries
+        run: bash scripts/ci/android/install-core.sh "$RUNNER_TEMP/core/android-core.tar.gz"
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Android SDK
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-35' 'build-tools;35.0.0' 'ndk;23.1.7779620' 'cmake;3.22.1'
+      - name: Build and test
+        working-directory: apps/multiplatform
+        env:
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: |
+          printf 'application_id.suffix=.verger\napp.name=Verger Associations\ndebuggable=false\n' > local.properties
+          ./gradlew --no-daemon --max-workers=1 -Dorg.gradle.jvmargs="-Xmx5g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8" -Pkotlin.compiler.execution.strategy=in-process -Pandroid.injected.build.abi=arm64-v8a -Pandroid.injected.testOnly=false "-PvergerVersionCode=$VERSION_CODE" "-PvergerVersionName=$VERSION_NAME" :common:desktopTest :android:testFossDebugUnitTest :android:assembleFossDebug
+      - name: Sign and verify APK
+        env:
+          VERGER_KEYSTORE: ${{ secrets.VERGER_ANDROID_KEYSTORE_BASE64 }}
+          VERGER_KEYSTORE_PASSWORD: ${{ secrets.VERGER_ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          test -n "$VERGER_KEYSTORE"
+          test -n "$VERGER_KEYSTORE_PASSWORD"
+          umask 077
+          store=$(mktemp "$RUNNER_TEMP/verger-signing.XXXXXX")
+          trap 'rm -f "$store"' EXIT
+          printf '%s' "$VERGER_KEYSTORE" | base64 -d > "$store"
+          sdk="$ANDROID_HOME/build-tools/35.0.0"
+          mkdir -p deliverable
+          "$sdk/apksigner" sign --ks "$store" --ks-key-alias verger --ks-pass env:VERGER_KEYSTORE_PASSWORD --out deliverable/verger-associations.apk apps/multiplatform/android/build/intermediates/apk/foss/debug/android-foss-arm64-v8a-debug.apk
+          "$sdk/apksigner" verify --verbose --print-certs deliverable/verger-associations.apk
+          "$sdk/aapt" dump badging deliverable/verger-associations.apk > "$RUNNER_TEMP/badging"
+          grep -F "package: name='chat.simplex.app.verger'" "$RUNNER_TEMP/badging"
+          grep -F "launchable-activity: name='chat.simplex.app.VergerActivity'" "$RUNNER_TEMP/badging"
+          if grep -F 'application-debuggable' "$RUNNER_TEMP/badging"; then exit 1; fi
+          "$sdk/aapt" dump xmltree deliverable/verger-associations.apk AndroidManifest.xml > "$RUNNER_TEMP/apk-manifest"
+          python3 scripts/ci/android/check-installable-manifest.py "$RUNNER_TEMP/apk-manifest"
+          unzip -l deliverable/verger-associations.apk > "$RUNNER_TEMP/apk-files"
+          for entry in assets/verger/index.html lib/arm64-v8a/libapp-lib.so lib/arm64-v8a/libsimplex.so lib/arm64-v8a/libsupport.so; do grep -F "$entry" "$RUNNER_TEMP/apk-files"; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verger-associations-android
+          path: deliverable/verger-associations.apk
+          retention-days: 30
