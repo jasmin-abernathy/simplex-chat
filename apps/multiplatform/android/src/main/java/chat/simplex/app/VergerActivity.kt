@@ -159,6 +159,7 @@ class VergerActivity : FragmentActivity() {
     setContentView(layout)
     val saved = preferences.getString("document", null)
     webView.loadUrl(if (VergerWebPolicy.isDocument(saved)) saved!! else VergerWebPolicy.HOME)
+    VergerUpdates.check(this)
   }
 
   private fun openChat(token: String, organizationId: String, accentColor: String) {
