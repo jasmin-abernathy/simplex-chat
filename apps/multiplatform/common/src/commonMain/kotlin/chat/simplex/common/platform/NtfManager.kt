@@ -36,6 +36,15 @@ abstract class NtfManager {
   )
 
   fun notifyMessageReceived(rhId: Long?, user: UserLike, cInfo: ChatInfo, cItem: ChatItem) {
+    val group = cInfo.groupInfo_
+    val event = (cItem.content as? CIContent.RcvGroupEventContent)?.rcvGroupEvent
+    if (event is RcvGroupEvent.NewMemberPendingReview) {
+      if (group?.canModerate == true) {
+        displayNotification(user = user, chatId = cInfo.id, displayName = cInfo.displayName,
+          msgText = generalGetString(MR.strings.rcv_group_event_new_member_pending_review))
+      }
+      return
+    }
     if (
       cItem.showNotification &&
       cInfo.ntfsEnabled(cItem) &&
