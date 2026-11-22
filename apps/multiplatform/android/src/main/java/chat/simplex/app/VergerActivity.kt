@@ -8,7 +8,14 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Color
+import android.util.Base64
+import androidx.activity.OnBackPressedCallback
+import androidx.compose.ui.graphics.asImageBitmap
+import chat.simplex.common.platform.resizeImageToStrSize
 import android.content.res.ColorStateList
 import android.net.Uri
 import java.net.HttpURLConnection
@@ -157,6 +164,17 @@ class VergerActivity : FragmentActivity() {
     }
     layout.addView(webView, LinearLayout.LayoutParams(-1, 0, 1f))
     setContentView(layout)
+    onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+      override fun handleOnBackPressed() {
+        if (!VergerWebPolicy.isDocument(webView.url)) {
+          moveTaskToBack(true)
+          return
+        }
+        webView.evaluateJavascript("typeof window.VergerBack === 'function' && window.VergerBack()") { handled ->
+          if (handled != "true" && !isFinishing && !isDestroyed) moveTaskToBack(true)
+        }
+      }
+    })
     val saved = preferences.getString("document", null)
     webView.loadUrl(if (VergerWebPolicy.isDocument(saved)) saved!! else VergerWebPolicy.HOME)
     VergerUpdates.check(this)
@@ -190,9 +208,13 @@ class VergerActivity : FragmentActivity() {
             role !in setOf("administrator", "facilitator", "member", "reader")) {
           throw IllegalStateException("Ce compte n'est pas autorisé pour cette association")
         }
+        val logo = groupLogo(json.optJSONObject("organization")?.optString("logoDataUrl").orEmpty())
         runOnUiThread {
           if (!isFinishing && !isDestroyed) {
-            VergerChatAuthorization.grant(organizationId, role == "administrator", accentColor.takeIf { Regex("^#[0-9a-fA-F]{6}$").matches(it) })
+            VergerChatAuthorization.grant(
+              organizationId, role == "administrator",
+              accentColor.takeIf { Regex("^#[0-9a-fA-F]{6}$").matches(it) }, logo
+            )
             // Keep VergerActivity and its WebView (including its in-memory session) on the back stack.
             startActivity(Intent(this, MainActivity::class.java))
           }
@@ -209,6 +231,25 @@ class VergerActivity : FragmentActivity() {
     }.start()
   }
 
+
+  private fun groupLogo(dataUrl: String): String? {
+    val prefix = "data:image/webp;base64,"
+    if (!dataUrl.startsWith(prefix) || dataUrl.length > 320_000) return null
+    return runCatching {
+      val bytes = Base64.decode(dataUrl.substring(prefix.length), Base64.NO_WRAP)
+      val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+      BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+      if (bounds.outWidth !in 1..512 || bounds.outHeight !in 1..512) return null
+      val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+      val side = maxOf(decoded.width, decoded.height)
+      val square = Bitmap.createBitmap(side, side, Bitmap.Config.ARGB_8888)
+      Canvas(square).apply {
+        drawColor(Color.WHITE)
+        drawBitmap(decoded, (side - decoded.width) / 2f, (side - decoded.height) / 2f, null)
+      }
+      resizeImageToStrSize(square.asImageBitmap(), maxDataSize = 12_500)
+    }.getOrNull()
+  }
 
   /** Save domain proof into the standard Downloads collection, no document picker (Android 10+).
    * Other exports preserve the explicit SAF picker and legacy Android uses it as fallback.

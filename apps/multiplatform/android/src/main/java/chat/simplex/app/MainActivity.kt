@@ -11,6 +11,8 @@ import android.widget.Toast
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.fragment.app.FragmentActivity
@@ -31,6 +33,7 @@ class MainActivity: FragmentActivity() {
   private var verifiedChatOrganizationId: String? = null
   private var mayCreateAssociationGroup: Boolean = false
   private var associationAccent: String? = null
+  private var associationLogo: String? = null
   private fun groupPreferenceKey(): String = "groupId." + (verifiedChatOrganizationId ?: "unverified")
 
   companion object {
@@ -59,6 +62,7 @@ class MainActivity: FragmentActivity() {
     mayCreateAssociationGroup = savedInstanceState?.getBoolean("mayCreateAssociationGroup")
       ?: (grant?.canCreateGroup == true)
     associationAccent = savedInstanceState?.getString("associationAccent") ?: grant?.accentColor
+    associationLogo = savedInstanceState?.getString("associationLogo") ?: grant?.logo
     // testJson()
     // When call ended and orientation changes, it re-process old intent, it's unneeded.
     // Only needed to be processed on first creation of activity
@@ -77,25 +81,32 @@ class MainActivity: FragmentActivity() {
     enableEdgeToEdge()
     setContent {
       Column(Modifier.fillMaxSize()) {
-        TextButton(
-          onClick = { finish() },
-          modifier = Modifier.fillMaxWidth().statusBarsPadding()
-        ) { Text("Retour aux outils du Verger") }
+        Row(
+          Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          associationLogo?.let { ProfileImage(32.dp, image = it) }
+          TextButton(onClick = { finish() }, modifier = Modifier.weight(1f)) {
+            Text("Retour aux outils du Verger")
+          }
+        }
         val groupPrefs = remember { getSharedPreferences("verger-group", MODE_PRIVATE) }
         val boundGroup = remember { mutableStateOf(groupPrefs.getLong(groupPreferenceKey(), -1).takeIf { it > 0 }) }
         Box(Modifier.weight(1f)) {
-          AppScreen(
-            vergerGroupOnly = true,
-            vergerGroupId = boundGroup.value,
-            vergerCanCreateGroup = mayCreateAssociationGroup,
-            vergerAccent = associationAccent,
-            onVergerGroupSelected = { selected ->
-              if (boundGroup.value == null && selected > 0) {
-                groupPrefs.edit().putLong(groupPreferenceKey(), selected).apply()
-                boundGroup.value = selected
+          CompositionLocalProvider(LocalVergerAssociationLogo provides associationLogo) {
+            AppScreen(
+              vergerGroupOnly = true,
+              vergerGroupId = boundGroup.value,
+              vergerCanCreateGroup = mayCreateAssociationGroup,
+              vergerAccent = associationAccent,
+              onVergerGroupSelected = { selected ->
+                if (boundGroup.value == null && selected > 0) {
+                  groupPrefs.edit().putLong(groupPreferenceKey(), selected).apply()
+                  boundGroup.value = selected
+                }
               }
-            }
-          )
+            )
+          }
         }
       }
     }
@@ -107,6 +118,7 @@ class MainActivity: FragmentActivity() {
     outState.putString("verifiedChatOrganizationId", verifiedChatOrganizationId)
     outState.putBoolean("mayCreateAssociationGroup", mayCreateAssociationGroup)
     outState.putString("associationAccent", associationAccent)
+    outState.putString("associationLogo", associationLogo)
     super.onSaveInstanceState(outState)
   }
 

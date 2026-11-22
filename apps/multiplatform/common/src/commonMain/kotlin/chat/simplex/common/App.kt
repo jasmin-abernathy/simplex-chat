@@ -426,6 +426,8 @@ fun StartPartOfScreen(
 }
 
 
+val LocalVergerAssociationLogo = compositionLocalOf<String?> { null }
+
 /** Groupe privé : pas d'annuaire public et un seul groupe associé à l'organisation.
  * La création est réservée à la présidence vérifiée par le serveur Verger. */
 @Composable
@@ -435,6 +437,7 @@ private fun VergerClosedGroupList(groupId: Long?, onGroupSelected: (Long) -> Uni
   val group = groups.firstOrNull { it.groupInfo.groupId == groupId }
   val invitation = rememberSaveable { mutableStateOf("") }
   val groupCreationOpened = rememberSaveable { mutableStateOf(false) }
+  val associationLogo = LocalVergerAssociationLogo.current
   val openGroupCreation: () -> Unit = {
     ModalManager.start.showCustomModal { close ->
       AddGroupView(
@@ -442,7 +445,8 @@ private fun VergerClosedGroupList(groupId: Long?, onGroupSelected: (Long) -> Uni
         chatModel.currentRemoteHost.value,
         close,
         closeAll = { ModalManager.start.closeModals() },
-        onGroupCreated = onGroupSelected
+        onGroupCreated = onGroupSelected,
+        associationLogo = associationLogo
       )
     }
   }
@@ -462,6 +466,9 @@ private fun VergerClosedGroupList(groupId: Long?, onGroupSelected: (Long) -> Uni
     if (groupId != null) {
       if (group != null) {
         Text("Groupe associé : " + group.localDisplayName)
+        if (group.groupInfo.isOwner && group.groupInfo.groupProfile.memberAdmission?.review != MemberCriteria.All) {
+          Text("Pour recevoir une demande à chaque arrivée par lien, activez l’examen pour tout le monde dans les réglages d’admission du groupe.")
+        }
         Button(
           onClick = { chatModel.chatId.value = group.id },
           modifier = Modifier.fillMaxWidth()

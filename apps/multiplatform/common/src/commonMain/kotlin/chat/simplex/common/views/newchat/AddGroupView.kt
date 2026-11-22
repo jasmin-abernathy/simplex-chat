@@ -36,7 +36,7 @@ import kotlinx.coroutines.*
 import java.net.URI
 
 @Composable
-fun AddGroupView(chatModel: ChatModel, rh: RemoteHostInfo?, close: () -> Unit, closeAll: () -> Unit, onGroupCreated: ((Long) -> Unit)? = null) {
+fun AddGroupView(chatModel: ChatModel, rh: RemoteHostInfo?, close: () -> Unit, closeAll: () -> Unit, onGroupCreated: ((Long) -> Unit)? = null, associationLogo: String? = null) {
   val rhId = rh?.remoteHostId
   val view = LocalMultiplatformView()
   AddGroupLayout(
@@ -67,7 +67,9 @@ fun AddGroupView(chatModel: ChatModel, rh: RemoteHostInfo?, close: () -> Unit, c
     },
     incognitoPref = chatModel.controller.appPrefs.incognito,
     rhId,
-    close
+    close,
+    associationLogo,
+    requireMemberReview = onGroupCreated != null
   )
 }
 
@@ -76,13 +78,15 @@ fun AddGroupLayout(
   createGroup: (Boolean, GroupProfile) -> Unit,
   incognitoPref: SharedPreference<Boolean>,
   rhId: Long?,
-  close: () -> Unit
+  close: () -> Unit,
+  associationLogo: String? = null,
+  requireMemberReview: Boolean = false
 ) {
   val bottomSheetModalState = rememberModalBottomSheetState(initialValue = ModalBottomSheetValue.Hidden)
   val scope = rememberCoroutineScope()
   val displayName = rememberSaveable { mutableStateOf("") }
   val chosenImage = rememberSaveable { mutableStateOf<URI?>(null) }
-  val profileImage = rememberSaveable { mutableStateOf<String?>(null) }
+  val profileImage = rememberSaveable(associationLogo) { mutableStateOf(associationLogo) }
   val focusRequester = remember { FocusRequester() }
   val incognito = remember { mutableStateOf(incognitoPref.get()) }
 
@@ -118,9 +122,9 @@ fun AddGroupLayout(
               Box(contentAlignment = Alignment.TopEnd) {
                 Box(contentAlignment = Alignment.Center) {
                   ProfileImage(128.dp, image = profileImage.value, icon = MR.images.ic_supervised_user_circle_filled)
-                  EditImageButton { scope.launch { bottomSheetModalState.show() } }
+                  if (associationLogo == null) EditImageButton { scope.launch { bottomSheetModalState.show() } }
                 }
-                if (profileImage.value != null) {
+                if (profileImage.value != null && associationLogo == null) {
                   DeleteImageButton { profileImage.value = null }
                 }
               }
@@ -160,6 +164,7 @@ fun AddGroupLayout(
                 fullName = "",
                 shortDescr = null,
                 image = profileImage.value,
+                memberAdmission = if (requireMemberReview) GroupMemberAdmission(review = MemberCriteria.All) else null,
                 groupPreferences = GroupPreferences(history = GroupPreference(GroupFeatureEnabled.ON))
               ))
             },
