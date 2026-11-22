@@ -1,6 +1,7 @@
 name: Verger Associations Android
 on:
   push:
+    branches: ['build/verger-build-*-v*']
     tags: ['verger-build-*-v*']
   workflow_dispatch:
     inputs:
@@ -37,14 +38,15 @@ jobs:
         env:
           VERSION_CODE: ${{ inputs.version_code }}
           VERSION_NAME: ${{ inputs.version_name }}
-          WEB_COMMIT: ${{ inputs.web_commit || 'f7a2c6024f1376218d21581019aa4c7ae539b477' }}
+          WEB_COMMIT: ${{ inputs.web_commit || '0a668b1a0ec208754965876f6c4c9878ce4b7fe3' }}
           VERGER_KEYSTORE: ${{ secrets.VERGER_ANDROID_KEYSTORE_BASE64 }}
           VERGER_KEYSTORE_PASSWORD: ${{ secrets.VERGER_ANDROID_KEYSTORE_PASSWORD }}
         run: |
           test -n "$VERGER_KEYSTORE"
           test -n "$VERGER_KEYSTORE_PASSWORD"
           if [[ "$GITHUB_EVENT_NAME" == push ]]; then
-            [[ "$GITHUB_REF_NAME" =~ ^verger-build-([1-9][0-9]{0,9})-v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || exit 1
+            build_ref="${GITHUB_REF_NAME#build/}"
+            [[ "$build_ref" =~ ^verger-build-([1-9][0-9]{0,9})-v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || exit 1
             VERSION_CODE="${BASH_REMATCH[1]}"
             VERSION_NAME="${BASH_REMATCH[2]}"
           fi
